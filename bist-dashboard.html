@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BORSA KOMUTAN - BIST İstanbul</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .ticker { animation: ticker 20s linear infinite; }
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+
+    <header class="glass sticky top-0 z-50 border-b border-slate-700">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center text-xl font-bold">K</div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">BORSA KOMUTAN</h1>
+                    <p class="text-xs text-slate-400">BIST İstanbul | <span id="clock" class="text-emerald-400">--:--:--</span></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="toggleTheme()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition">🌙</button>
+                <button onclick="refreshAll()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition flex items-center gap-2">
+                    <span id="refresh-icon">🔄</span> Yenile
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-slate-800 border-b border-slate-700 overflow-hidden py-2">
+        <div class="ticker whitespace-nowrap flex gap-8 text-sm">
+            <span class="text-emerald-400">XU100: <span id="ticker-xu100">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">XU30: <span id="ticker-xu30">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-red-400">USD/TRY: <span id="ticker-usd">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">THYAO: <span id="ticker-thyao">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">GARAN: <span id="ticker-garan">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">ASELS: <span id="ticker-asels">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">XU100: <span id="ticker-xu100-2">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">XU30: <span id="ticker-xu30-2">--</span></span>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6 space-y-6">
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">1. VERİ</span>
+                    <span id="status-veri" class="w-2 h-2 rounded-full bg-emerald-500 pulse"></span>
+                </div>
+                <p class="text-sm font-medium">OHLCV + PM</p>
+                <p class="text-xs text-slate-500 mt-1">Gap/Hacim/ATR</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">2. MEDYA</span>
+                    <span id="status-medya" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                </div>
+                <p class="text-sm font-medium">KAP/Haber</p>
+                <p class="text-xs text-slate-500 mt-1">Sentiment</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">3. MAKRO</span>
+                    <span id="status-makro" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                </div>
+                <p class="text-sm font-medium">Dolar/Faiz</p>
+                <p class="text-xs text-slate-500 mt-1">Sektör Etkisi</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">4. TEKNİK</span>
+                    <span id="status-teknik" class="w-2 h-2 rounded-full bg-emerald-500 pulse"></span>
+                </div>
+                <p class="text-sm font-medium">RSI/MACD/BB</p>
+                <p class="text-xs text-slate-500 mt-1">SMA Kesişim</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">5. RİSK</span>
+                    <span id="status-risk" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                </div>
+                <p class="text-sm font-medium">Sharpe/VaR</p>
+                <p class="text-xs text-slate-500 mt-1">MaxDD/Vol</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">6. ENSEMBLE</span>
+                    <span id="status-ensemble" class="w-2 h-2 rounded-full bg-blue-500 pulse"></span>
+                </div>
+                <p class="text-sm font-medium">Ağırlıklı Birleşim</p>
+                <p class="text-xs text-slate-500 mt-1">Teknik%40 Risk%25</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase">7. RAPOR</span>
+                    <span id="status-rapor" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                </div>
+                <p class="text-sm font-medium">Özet Rapor</p>
+                <p class="text-xs text-slate-500 mt-1">Dosyaya Yaz</p>
+            </div>
+
+            <div class="glass rounded-xl p-4 border-2 border-red-500/50">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-semibold text-red-400 uppercase">8. KOMUTAN</span>
+                    <span id="status-komutan" class="w-2 h-2 rounded-full bg-red-500"></span>
+                </div>
+                <p class="text-sm font-medium text-red-400">Nihai Karar</p>
+                <p class="text-xs text-slate-500 mt-1">Telegram</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-2 glass rounded-xl p-4 border border-slate-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">📈 XU100 - BIST 100</h2>
+                    <div class="flex gap-2">
+                        <button onclick="setTimeframe('1D')" class="px-3 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600">1G</button>
+                        <button onclick="setTimeframe('1W')" class="px-3 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600">1H</button>
+                        <button onclick="setTimeframe('1M')" class="px-3 py-1 text-xs rounded bg-emerald-600">1A</button>
+                    </div>
+                </div>
+                <div class="relative h-80">
+                    <canvas id="mainChart"></canvas>
+                </div>
+                <div class="grid grid-cols-4 gap-4 mt-4 text-center">
+                    <div>
+                        <p class="text-xs text-slate-500">Açılış</p>
+                        <p id="ohlc-open" class="font-semibold">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Yüksek</p>
+                        <p id="ohlc-high" class="font-semibold text-emerald-400">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Düşük</p>
+                        <p id="ohlc-low" class="font-semibold text-red-400">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Kapanış</p>
+                        <p id="ohlc-close" class="font-semibold">--</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700 space-y-4">
+                <h2 class="text-lg font-semibold text-red-400">🎯 KOMUTAN KARARI</h2>
+
+                <div class="text-center py-6">
+                    <div id="komutan-decision" class="text-4xl font-bold mb-2 text-yellow-400">BEKLE</div>
+                    <div class="text-sm text-slate-400">Güven Skoru</div>
+                    <div class="text-2xl font-bold text-emerald-400" id="confidence-score">%--</div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Teknik</span>
+                        <span id="score-teknik" class="font-semibold">--</span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div id="bar-teknik" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Risk</span>
+                        <span id="score-risk" class="font-semibold">--</span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div id="bar-risk" class="bg-yellow-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Makro</span>
+                        <span id="score-makro" class="font-semibold">--</span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div id="bar-makro" class="bg-purple-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Medya</span>
+                        <span id="score-medya" class="font-semibold">--</span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div id="bar-medya" class="bg-emerald-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-700">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-slate-400">Risk Skoru</span>
+                        <span id="risk-skor" class="font-bold text-yellow-400">--/100</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Son Güncelleme</span>
+                        <span id="last-update" class="text-xs">--</span>
+                    </div>
+                </div>
+
+                <button onclick="sendTelegram()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold transition flex items-center justify-center gap-2">
+                    📱 Telegram'a Gönder
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <h3 class="text-lg font-semibold mb-4">📋 Son Raporlar</h3>
+                <div id="rapor-list" class="space-y-3 max-h-64 overflow-y-auto">
+                    <div class="p-3 bg-slate-800 rounded-lg border-l-4 border-emerald-500">
+                        <div class="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>overchat_al.py</span>
+                            <span id="rapor-time">--:--</span>
+                        </div>
+                        <p class="text-sm" id="rapor-text">Rapor bekleniyor...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-700">
+                <h3 class="text-lg font-semibold mb-4">🔍 Modül Detayları</h3>
+                <div id="module-detail" class="space-y-2 text-sm">
+                    <p class="text-slate-500">Veriler yükleniyor...</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center text-xs text-slate-600 py-4">
+            BORSA KOMUTAN SİSTEMİ v1.0 | 8 AI Modül | BIST İstanbul |
+            <span class="text-slate-500">Veriler gecikmeli olabilir. Yatırım tavsiyesi değildir.</span>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5001/api/data';
+
+        async function fetchRealData() {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    mode: 'cors'
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                console.log('API yanıtı:', data);
+
+                if (data.status === 'OK') {
+                    updateDashboard(data);
+                    updateChart(data.ohlcv);
+                }
+            } catch (error) {
+                console.error('Hata:', error);
+                document.getElementById('module-detail').innerHTML =
+                    `<p class="text-red-400">Hata: ${error.message}</p>`;
+            }
+        }
+
+        function updateDashboard(data) {
+            const ohlcv = data.ohlcv;
+            const last = ohlcv.close.length - 1;
+
+            document.getElementById('ohlc-open').textContent = ohlcv.open[last].toFixed(2);
+            document.getElementById('ohlc-high').textContent = ohlcv.high[last].toFixed(2);
+            document.getElementById('ohlc-low').textContent = ohlcv.low[last].toFixed(2);
+            document.getElementById('ohlc-close').textContent = ohlcv.close[last].toFixed(2);
+
+            const close = ohlcv.close[last].toFixed(2);
+            document.getElementById('ticker-xu100').textContent = close;
+            document.getElementById('ticker-xu100-2').textContent = close;
+
+            const decision = data.decision.karar;
+            const el = document.getElementById('komutan-decision');
+            el.textContent = decision;
+            el.className = 'text-4xl font-bold mb-2 ' +
+                (decision === 'AL' ? 'text-emerald-400' :
+                 decision === 'SAT' ? 'text-red-400' : 'text-yellow-400');
+
+            document.getElementById('confidence-score').textContent = '%' + data.decision.guven;
+            document.getElementById('risk-skor').textContent = data.risk.risk_skor + '/100';
+
+            const modules = data.ensemble.module_breakdown;
+            if (modules.teknik) {
+                document.getElementById('score-teknik').textContent = modules.teknik.score;
+                document.getElementById('bar-teknik').style.width = modules.teknik.score + '%';
+            }
+            if (modules.risk) {
+                document.getElementById('score-risk').textContent = modules.risk.score;
+                document.getElementById('bar-risk').style.width = modules.risk.score + '%';
+            }
+            if (modules.makro) {
+                document.getElementById('score-makro').textContent = modules.makro.score;
+                document.getElementById('bar-makro').style.width = modules.makro.score + '%';
+            }
+            if (modules.medya) {
+                document.getElementById('score-medya').textContent = modules.medya.score;
+                document.getElementById('bar-medya').style.width = modules.medya.score + '%';
+            }
+
+            document.getElementById('rapor-time').textContent = data.timestamp.split(' ')[1];
+            document.getElementById('rapor-text').textContent =
+                `Karar: ${decision} | Güven: %${data.decision.guven} | Risk: ${data.risk.risk_level}`;
+
+            document.getElementById('last-update').textContent = data.timestamp;
+
+            // Modül Detayları
+            const metrics = data.risk.metrics;
+            const teknik = data.teknik.indicators;
+
+            document.getElementById('module-detail').innerHTML = `
+                <div class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase mb-2">RİSK METRİKLERİ</div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Yıllık Volatilite</span>
+                        <span class="text-emerald-400 font-semibold">${metrics.volatility_yearly}%</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Sharpe Ratio</span>
+                        <span class="text-emerald-400 font-semibold">${metrics.sharpe_ratio}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">VaR (95%)</span>
+                        <span class="text-red-400 font-semibold">${metrics.var_95_percent}%</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Max Drawdown</span>
+                        <span class="text-red-400 font-semibold">${metrics.max_drawdown_percent}%</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">ATR %</span>
+                        <span class="text-yellow-400 font-semibold">${metrics.atr_percent}%</span>
+                    </div>
+
+                    <div class="text-xs font-semibold text-slate-400 uppercase mb-2 mt-4">TEKNİK GÖSTERGELER</div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">RSI (14)</span>
+                        <span class="text-blue-400 font-semibold">${teknik.rsi}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">MACD</span>
+                        <span class="text-blue-400 font-semibold">${teknik.macd}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">MACD Sinyal</span>
+                        <span class="text-blue-400 font-semibold">${teknik.macd_signal}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">BB Pozisyon</span>
+                        <span class="text-purple-400 font-semibold">${(teknik.bb_position * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">SMA50/200</span>
+                        <span class="text-purple-400 font-semibold">${teknik.sma50} / ${teknik.sma200}</span>
+                    </div>
+
+                    <div class="text-xs font-semibold text-slate-400 uppercase mb-2 mt-4">MAKRO VERİLER</div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">USD/TRY</span>
+                        <span class="text-orange-400 font-semibold">${data.makro.data.usd_try}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">USD Değişim</span>
+                        <span class="text-orange-400 font-semibold">${data.makro.data.usd_change}%</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Faiz</span>
+                        <span class="text-orange-400 font-semibold">%${data.makro.data.faiz}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Enflasyon</span>
+                        <span class="text-orange-400 font-semibold">%${data.makro.data.enflasyon}</span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('status-veri').className = 'w-2 h-2 rounded-full bg-emerald-500 pulse';
+            document.getElementById('status-teknik').className = 'w-2 h-2 rounded-full bg-emerald-500 pulse';
+            document.getElementById('status-risk').className = 'w-2 h-2 rounded-full bg-emerald-500';
+            document.getElementById('status-makro').className = 'w-2 h-2 rounded-full bg-emerald-500';
+            document.getElementById('status-medya').className = 'w-2 h-2 rounded-full bg-emerald-500';
+            document.getElementById('status-ensemble').className = 'w-2 h-2 rounded-full bg-blue-500 pulse';
+            document.getElementById('status-komutan').className = 'w-2 h-2 rounded-full bg-red-500';
+        }
+
+        let mainChart;
+
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+
+            mainChart = new Chart(ctx, {
+                type: 'candlestick',
+                data: {
+                    datasets: [
+                        {
+                            label: 'XU100',
+                            data: [],
+                            color: { up: '#10b981', down: '#ef4444', unchanged: '#94a3b8' },
+                            borderColor: { up: '#10b981', down: '#ef4444' }
+                        },
+                        {
+                            label: 'SMA20',
+                            type: 'line',
+                            data: [],
+                            borderColor: '#3b82f6',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'SMA50',
+                            type: 'line',
+                            data: [],
+                            borderColor: '#f59e0b',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'BB Üst',
+                            type: 'line',
+                            data: [],
+                            borderColor: 'rgba(168, 85, 247, 0.5)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            borderDash: [5, 5],
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'BB Alt',
+                            type: 'line',
+                            data: [],
+                            borderColor: 'rgba(168, 85, 247, 0.5)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            borderDash: [5, 5],
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'day' },
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(ohlcv) {
+            const candlesticks = ohlcv.dates.map((date, i) => ({
+                x: new Date(date).getTime(),
+                o: ohlcv.open[i],
+                h: ohlcv.high[i],
+                l: ohlcv.low[i],
+                c: ohlcv.close[i]
+            }));
+
+            // SMA20
+            const sma20 = [];
+            for (let i = 19; i < ohlcv.close.length; i++) {
+                let sum = 0;
+                for (let j = 0; j < 20; j++) sum += ohlcv.close[i - j];
+                sma20.push({
+                    x: new Date(ohlcv.dates[i]).getTime(),
+                    y: sum / 20
+                });
+            }
+
+            // SMA50
+            const sma50 = [];
+            for (let i = 49; i < ohlcv.close.length; i++) {
+                let sum = 0;
+                for (let j = 0; j < 50; j++) sum += ohlcv.close[i - j];
+                sma50.push({
+                    x: new Date(ohlcv.dates[i]).getTime(),
+                    y: sum / 50
+                });
+            }
+
+            // Bollinger Bands
+            const bbUpper = [], bbLower = [];
+            for (let i = 19; i < ohlcv.close.length; i++) {
+                let sum = 0, sumSq = 0;
+                for (let j = 0; j < 20; j++) {
+                    sum += ohlcv.close[i - j];
+                    sumSq += ohlcv.close[i - j] * ohlcv.close[i - j];
+                }
+                const mean = sum / 20;
+                const std = Math.sqrt(sumSq / 20 - mean * mean);
+                const time = new Date(ohlcv.dates[i]).getTime();
+                bbUpper.push({ x: time, y: mean + 2 * std });
+                bbLower.push({ x: time, y: mean - 2 * std });
+            }
+
+            if (mainChart) {
+                mainChart.data.datasets[0].data = candlesticks;
+                mainChart.data.datasets[1].data = sma20;
+                mainChart.data.datasets[2].data = sma50;
+                mainChart.data.datasets[3].data = bbUpper;
+                mainChart.data.datasets[4].data = bbLower;
+                mainChart.update();
+            }
+        }
+
+        function updateClock() {
+            document.getElementById('clock').textContent =
+                new Date().toLocaleTimeString('tr-TR');
+        }
+
+        function refreshAll() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('animate-spin');
+            fetchRealData().then(() => {
+                setTimeout(() => icon.classList.remove('animate-spin'), 1000);
+            });
+        }
+
+        function sendTelegram() {
+            alert('Telegram simülasyon modu!\n\nKarar: ' + document.getElementById('komutan-decision').textContent);
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('bg-slate-900');
+            document.body.classList.toggle('bg-white');
+            document.body.classList.toggle('text-white');
+            document.body.classList.toggle('text-slate-900');
+        }
+
+        function setTimeframe(tf) {
+            console.log('Zaman dilimi:', tf);
+        }
+
+        function init() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            initChart();
+            fetchRealData();
+            setInterval(fetchRealData, 30000);
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

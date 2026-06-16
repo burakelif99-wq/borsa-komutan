@@ -1,0 +1,57 @@
+
+======================================================================
+BORSA KOMUTAN SİSTEMİ - GÜNLÜK RAPOR
+======================================================================
+Tarih: 2026-06-17
+Saat:  00:31
+======================================================================
+
+📊 PAZAR DURUMU
+BIST 100 (XU100): 14446.4
+Son Güncelleme: 2026-06-17 00:31:13
+
+📈 TEKNİK ANALİZ
+RSI (14): 71.44
+MACD: -44.9666
+Sinyal: -69.8901
+BB Pozisyon: %84.7
+SMA50: 14023.0
+SMA200: nan
+Teknik Skor: 68.9/100
+
+⚠️ RİSK METRİKLERİ
+Yıllık Volatilite: 29.17%
+Sharpe Ratio: 0.052
+VaR (95%): -1.96%
+Max Drawdown: -13.01%
+ATR: 2.56%
+Risk Skoru: 52.5/100
+Risk Seviyesi: YUKSEK_RISK
+
+🌍 MAKRO VERİLER
+USD/TRY: 46.3039
+USD Değişim: 0.09%
+Faiz: %50.0
+Enflasyon: %61.5
+Makro Skor: 60.6/100
+
+📰 MEDYA/SENTIMENT
+Sentiment: NÖTR
+Skor: 50.9/100
+KAP Bildirim: 4
+
+🎯 ENSEMBLE KARARI
+Nihai Skor: 60.4/100
+Karar: BEKLE
+Güven: %20.9
+
+Modül Katkıları:
+  • TEKNIK: 68.9 x 0.4 = 27.6
+  • RISK: 52.5 x 0.25 = 13.1
+  • MAKRO: 60.6 x 0.2 = 12.1
+  • MEDYA: 50.9 x 0.15 = 7.6
+
+======================================================================
+⚠️ UYARI: Bu rapor otomatik oluşturulmuştur.
+Yatırım tavsiyesi değildir.
+======================================================================
