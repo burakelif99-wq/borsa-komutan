@@ -1,0 +1,16 @@
+{
+  "versiyon": "4.3",
+  "tarih": "2026-06-26T16:17:42.475931",
+  "toplam_ozellik": 46,
+  "secili_ozellik": 30,
+  "modeller": [
+    "random_forest",
+    "xgboost",
+    "gradient_boosting"
+  ],
+  "kutuphaneler": {
+    "sklearn": true,
+    "lightgbm": false,
+    "xgboost": true
+  }
+}

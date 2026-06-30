@@ -76,3 +76,65 @@ if __name__ == "__main__":
         print(f"Son 5 PM: {df['PM'].tail().tolist()}")
     else:
         print(f"Hata: {result['message']}")
+
+
+# veri_al.py - Hisse verisi ekle (en alta)
+
+def get_hisse_fiyat(sembol):
+    """
+    Tek hisse fiyatı çek
+    """
+    try:
+        ticker = yf.Ticker(f"{sembol}.IS")
+        data = ticker.history(period="2d")
+
+        if len(data) >= 2:
+            son = data['Close'].iloc[-1]
+            onceki = data['Close'].iloc[-2]
+            degisim = (son - onceki) / onceki * 100
+
+            return {
+                'status': 'OK',
+                'fiyat': round(son, 2),
+                'degisim': round(degisim, 2)
+            }
+        else:
+            return {'status': 'ERROR', 'message': 'Yetersiz veri'}
+
+    except Exception as e:
+        return {'status': 'ERROR', 'message': str(e)}
+
+
+def get_populer_hisseler():
+    """
+    Popüler hisselerin fiyatlarını çek
+    """
+    hisseler = ['THYAO', 'GARAN', 'ASELS', 'EREGL', 'SASA', 'KONTR']
+    sonuclar = {}
+
+    for hisse in hisseler:
+        sonuc = get_hisse_fiyat(hisse)
+        if sonuc['status'] == 'OK':
+            sonuclar[hisse] = sonuc
+        else:
+            sonuclar[hisse] = {'fiyat': 0, 'degisim': 0}
+
+    return sonuclar
+
+# veri_al.py - SONUNA EKLE (mevcut fonksiyonların altına)
+
+def get_usdtry():
+    """USD/TRY kuru çek"""
+    try:
+        import yfinance as yf
+        usd = yf.Ticker("USDTRY=X")
+        df = usd.history(period="1d")
+        if not df.empty:
+            return {
+                'status': 'OK',
+                'rate': round(df['Close'].iloc[-1], 2),
+                'change': round(df['Close'].iloc[-1] - df['Open'].iloc[-1], 2)
+            }
+        return {'status': 'HATA', 'message': 'USD/TRY verisi boş'}
+    except Exception as e:
+        return {'status': 'HATA', 'message': str(e)}

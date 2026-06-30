@@ -1,0 +1,23 @@
+
+26.06.2026 saa:21:29 opencode
+Bu bir BIST 580 hisse pipeline + Kimi ikinci-gorus sistemidir.
+Asagidaki noktadan devam ediyoruz:
+
+[GUNCEL DURUM]
+- Pipeline RF model: 92 feature (85 teknik + 8 sektor-relative), RandomForest 1000 tree, class_weight AL=0.96 SAT=0.97 BEKLE=1.08, MAX_OZELLIK=35
+- Sektor mapping: gemini_al.py'de 6 sektor (TEKNOLOJI/BANKACI/ENERJI/GIDA/SINAI/HIZMET) ~180 hisse, DIGER catch-all
+- WILDCARD esikleri: gap %1.5, hacim 1.5x, momentum %7, gunluk %3
+- Backtest (30 gun): %47.8 accuracy, 195 AL, +%232 P&L
+- Kimi 50-hisse modeli: 58 feature (+%2.04 P&L), bagimsiz alternatif
+- Pipeline +%250 P&L'de, sektor feature'lari canli skorlamada aktif
+
+[YAPILAN SON DEGISIKLIKLER]
+1. WILDCARD esikleri yumusatildi (wildcard_al.py)
+2. Sektor-relative feature eklendi (ai_egit.py:92 feature, 8'i sektor)
+3. Skorlama destegi (ai_skorlayici.py + grok_al.py: sektor ortalamalari loop-oncesi hesaplanir)
+4. Pipeline 200 hisse ile egitildi, backtest +%232 P&L
+
+[SIRADA]
+1. Backtest'teki "12 ozellik bulunamadi" uyarisi bastirilabilir (sma_200 eksik)
+2. Sektor mapping'i guncellenebilir (yeni halka arzlar vs)
+3. WILDCARD canli tetikleme takibi

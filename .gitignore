@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.joblib
+*.pkl
+*.db
+.env
+.idea/
+.vscode/
+logs/
+dashboard_data/
+rapor/
+veri/
+Notlar*.txt
+*_notu.txt
+*.bak
+*.BACKUP

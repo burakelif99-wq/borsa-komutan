@@ -1,0 +1,1 @@
+import hisse_analiz; r = hisse_analiz.analyze_hisse('AKBNK.IS', '1D'); print('Skor:', r.get('final_score')); print('Karar:', r.get('decision')); print('Teknik:', r.get('moduller', {}).get('teknik', {}).get('skor')); print('Neden:', r.get('moduller', {}).get('teknik', {}).get('neden'))

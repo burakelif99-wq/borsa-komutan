@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quant System Operator Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+--bg-primary:#0a0e1a;--bg-secondary:#111827;--bg-card:#1a1f2e;--bg-card-hover:#222838;
+--border-color:#2a3142;--text-primary:#e2e8f0;--text-secondary:#94a3b8;--text-muted:#64748b;
+--accent-green:#22c55e;--accent-red:#ef4444;--accent-yellow:#eab308;--accent-blue:#3b82f6;
+--accent-cyan:#06b6d4;--accent-purple:#8b5cf6;--accent-orange:#f97316;
+--gauge-track:#334155;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh}
+.header{background:linear-gradient(135deg,var(--bg-secondary)0%,var(--bg-card)100%);border-bottom:1px solid var(--border-color);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header-left{display:flex;align-items:center;gap:14px}
+.logo{width:44px;height:44px;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 15px rgba(6,182,212,0.3)}
+.header-title h1{font-size:18px;font-weight:700;letter-spacing:-0.3px}
+.header-title p{font-size:11px;color:var(--text-muted);margin-top:2px;letter-spacing:0.5px}
+.header-right{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.header-stat{text-align:center;padding:6px 14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-color)}
+.header-stat .label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px}
+.header-stat .value{font-size:13px;font-weight:600;color:var(--text-primary);margin-top:2px}
+.header-stat .value.health{color:var(--accent-green)}
+.header-stat .value.model{color:var(--accent-cyan)}
+.dashboard-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;padding:20px 24px;max-width:1600px;margin:0 auto}
+.card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:18px;transition:all 0.3s ease}
+.card:hover{border-color:#3a4155;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px}
+.card-badge{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600}
+.badge-green{background:rgba(34,197,94,0.15);color:var(--accent-green)}
+.badge-red{background:rgba(239,68,68,0.15);color:var(--accent-red)}
+.badge-yellow{background:rgba(234,179,8,0.15);color:var(--accent-yellow)}
+.badge-blue{background:rgba(59,130,246,0.15);color:var(--accent-blue)}
+.gauge-card{grid-column:span 2;min-height:200px}
+.gauge-container{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100% - 40px)}
+.gauge-wrapper{position:relative;width:120px;height:60px;margin-bottom:12px}
+.gauge-value{position:absolute;bottom:0;left:50%;transform:translateX(-50%);font-size:28px;font-weight:800;line-height:1}
+.gauge-value.green{color:var(--accent-green)}
+.gauge-value.yellow{color:var(--accent-yellow)}
+.gauge-value.red{color:var(--accent-red)}
+.gauge-label{font-size:11px;color:var(--text-muted);text-align:center}
+.gauge-thresholds{display:flex;justify-content:center;gap:12px;margin-top:10px;font-size:9px;color:var(--text-muted)}
+.threshold-item{display:flex;align-items:center;gap:4px}
+.threshold-dot{width:6px;height:6px;border-radius:50%}
+.dot-green{background:var(--accent-green)}
+.dot-yellow{background:var(--accent-yellow)}
+.dot-red{background:var(--accent-red)}
+.mini-chart-container{width:100%;height:50px;margin-top:8px}
+.alarm-card{grid-column:span 2;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.alarm-icon{width:80px;height:80px;border-radius:50%;background:rgba(34,197,94,0.1);border:2px solid var(--accent-green);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:14px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.4)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
+.alarm-title{font-size:20px;font-weight:700;color:var(--accent-green)}
+.alarm-subtitle{font-size:11px;color:var(--text-muted);margin-top:6px}
+.signal-card{grid-column:span 3;min-height:280px}
+.pie-container{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:10px}
+.pie-chart-wrapper{width:140px;height:140px;position:relative}
+.pie-center-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.pie-center-text .number{font-size:24px;font-weight:700;color:var(--text-primary)}
+.pie-center-text .label{font-size:10px;color:var(--text-muted)}
+.pie-legend{display:flex;flex-direction:column;gap:10px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.legend-dot{width:10px;height:10px;border-radius:3px}
+.legend-value{font-weight:600;margin-left:auto}
+.regime-perf-card{grid-column:span 3;min-height:280px}
+.bar-chart-container{height:180px;margin-top:10px}
+.daily-pnl-card{grid-column:span 3;min-height:280px}
+.signal-table-card{grid-column:span 6;min-height:320px}
+.signal-table{width:100%;border-collapse:collapse;font-size:12px}
+.signal-table th{text-align:left;padding:10px 8px;color:var(--text-muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-color)}
+.signal-table td{padding:10px 8px;border-bottom:1px solid rgba(42,49,66,0.5);color:var(--text-secondary)}
+.signal-table tr:hover td{background:var(--bg-card-hover)}
+.ticker-cell{font-weight:600;color:var(--text-primary)}
+.regime-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.regime-bull{background:rgba(34,197,94,0.15);color:var(--accent-green)}
+.regime-bear{background:rgba(239,68,68,0.15);color:var(--accent-red)}
+.regime-sideways{background:rgba(234,179,8,0.15);color:var(--accent-yellow)}
+.proba-bar{display:flex;align-items:center;gap:6px}
+.proba-track{width:60px;height:6px;background:var(--gauge-track);border-radius:3px;overflow:hidden}
+.proba-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
+.proba-fill.high{background:var(--accent-green)}
+.proba-fill.medium{background:var(--accent-yellow)}
+.proba-fill.low{background:var(--accent-red)}
+.signal-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700}
+.signal-al{background:rgba(34,197,94,0.2);color:var(--accent-green);border:1px solid rgba(34,197,94,0.3)}
+.signal-bekle{background:rgba(148,163,184,0.15);color:var(--text-secondary);border:1px solid rgba(148,163,184,0.2)}
+.signal-sat{background:rgba(239,68,68,0.2);color:var(--accent-red);border:1px solid rgba(239,68,68,0.3)}
+.reason-text{font-size:11px;color:var(--text-muted)}
+.proba-dist-card{grid-column:span 6;min-height:280px}
+.metrics-trend-card{grid-column:span 6;min-height:280px}
+.trend-table{width:100%;border-collapse:collapse}
+.trend-table td{padding:12px 8px;border-bottom:1px solid rgba(42,49,66,0.5)}
+.trend-metric{font-size:12px;font-weight:600;color:var(--text-primary)}
+.trend-sparkline{width:100px;height:30px}
+.trend-status{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+.status-normal{background:rgba(34,197,94,0.15);color:var(--accent-green)}
+.status-warning{background:rgba(234,179,8,0.15);color:var(--accent-yellow)}
+.status-alert{background:rgba(239,68,68,0.15);color:var(--accent-red)}
+.footer{grid-column:span 12;display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--border-color);font-size:10px;color:var(--text-muted)}
+.footer-left,.footer-right{display:flex;gap:20px}
+
+/* NEW STYLES */
+.experiment-card{grid-column:span 3;min-height:200px}
+.experiment-counter{text-align:center;padding:20px 0}
+.experiment-days{font-size:48px;font-weight:800;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.experiment-label{font-size:12px;color:var(--text-muted);margin-top:4px}
+.experiment-progress{width:100%;height:8px;background:var(--gauge-track);border-radius:4px;margin-top:16px;overflow:hidden}
+.experiment-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-blue));border-radius:4px}
+.experiment-days-text{font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center}
+
+.canary-card,.opportunities-card{grid-column:span 3;min-height:200px}
+.canary-list,.opportunities-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.canary-item,.opportunity-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border-color)}
+.canary-item .ticker{font-weight:600;font-size:13px}
+.canary-item .change{font-size:11px;font-weight:600}
+.canary-item .change.up{color:var(--accent-green)}
+.canary-item .change.down{color:var(--accent-red)}
+.canary-reason{font-size:10px;color:var(--text-muted);margin-top:2px}
+.opportunity-item{border-left:3px solid var(--accent-green)}
+.opportunity-item .v1-tag{font-size:10px;padding:2px 6px;background:rgba(239,68,68,0.15);color:var(--accent-red);border-radius:4px}
+.opportunity-item .v2-tag{font-size:10px;padding:2px 6px;background:rgba(34,197,94,0.15);color:var(--accent-green);border-radius:4px}
+
+.equity-curve-card{grid-column:span 6;min-height:300px}
+.perf-compare-card{grid-column:span 6;min-height:300px}
+.perf-metric-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(42,49,66,0.5)}
+.perf-metric-row:last-child{border-bottom:none}
+.perf-metric-label{font-size:12px;color:var(--text-secondary)}
+.perf-metric-values{display:flex;gap:24px;align-items:center}
+.perf-value-group{text-align:right}
+.perf-value-group .label{font-size:9px;color:var(--text-muted);text-transform:uppercase}
+.perf-value-group .value{font-size:16px;font-weight:700}
+.perf-value-group .value.v1{color:var(--accent-yellow)}
+.perf-value-group .value.v2{color:var(--accent-green)}
+.perf-value-group .value.benchmark{color:var(--accent-blue)}
+.perf-diff{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}
+.perf-diff.positive{background:rgba(34,197,94,0.15);color:var(--accent-green)}
+.perf-diff.negative{background:rgba(239,68,68,0.15);color:var(--accent-red)}
+
+.confusion-card{grid-column:span 3;min-height:280px}
+.confusion-matrix{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:2px;margin-top:10px;font-size:12px}
+.confusion-cell{padding:10px;text-align:center;border-radius:6px;font-weight:600}
+.confusion-header{padding:10px;text-align:center;font-size:10px;color:var(--text-muted);font-weight:500}
+.confusion-label{padding:10px;text-align:right;font-size:10px;color:var(--text-muted);font-weight:500}
+.cm-correct{background:rgba(34,197,94,0.15);color:var(--accent-green)}
+.cm-wrong{background:rgba(239,68,68,0.15);color:var(--accent-red)}
+.cm-neutral{background:rgba(148,163,184,0.1);color:var(--text-secondary)}
+
+.filtered-card{grid-column:span 6;min-height:280px}
+.filtered-tabs{display:flex;gap:8px;margin-bottom:12px}
+.filtered-tab{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);transition:all 0.2s}
+.filtered-tab.active{background:rgba(59,130,246,0.15);color:var(--accent-blue);border-color:var(--accent-blue)}
+.filtered-tab:hover{border-color:var(--accent-blue)}
+
+.pr-trend-card{grid-column:span 6;min-height:280px}
+.chart-container{height:220px}
+
+@media (max-width:1200px){
+.gauge-card,.alarm-card,.experiment-card,.canary-card,.opportunities-card,.confusion-card{grid-column:span 3}
+.signal-card,.regime-perf-card,.daily-pnl-card{grid-column:span 6}
+.signal-table-card,.proba-dist-card,.metrics-trend-card,.equity-curve-card,.perf-compare-card,.filtered-card,.pr-trend-card{grid-column:span 12}
+}
+@media (max-width:768px){
+.gauge-card,.alarm-card,.experiment-card,.canary-card,.opportunities-card,.confusion-card,.signal-card,.regime-perf-card,.daily-pnl-card,.signal-table-card,.proba-dist-card,.metrics-trend-card,.equity-curve-card,.perf-compare-card,.filtered-card,.pr-trend-card{grid-column:span 12}
+.header{flex-direction:column;align-items:flex-start}
+.header-right{width:100%;justify-content:space-between}
+}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg-primary)}
+::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#3a4155}
+</style>
+</head>
+<body>
+
+<header class="header">
+<div class="header-left">
+<div class="logo">🧠</div>
+<div class="header-title">
+<h1>QUANT SYSTEM OPERATOR DASHBOARD</h1>
+<p>LIVE SYSTEM HEALTH — v1.0</p>
+</div>
+</div>
+<div class="header-right">
+<div class="header-stat"><div class="label">Sistem Durumu</div><div class="value health">SAĞLIKLI ✅</div></div>
+<div class="header-stat"><div class="label">Tarih</div><div class="value">2026-06-29</div></div>
+<div class="header-stat"><div class="label">Veri Kapsamı</div><div class="value">Son 5 Gün</div></div>
+<div class="header-stat"><div class="label">Son Güncelleme</div><div class="value">29.06.2026 18:10</div></div>
+<div class="header-stat"><div class="label">Model</div><div class="value model">ai_model_v43_20260627_221915</div></div>
+<div class="header-stat"><div class="label">Strateji</div><div class="value model">GB=1.0 | RF Guard (bear only)</div></div>
+</div>
+</header>
+
+<div class="dashboard-grid">
+<!-- GAUGE CARDS -->
+<div class="card gauge-card">
+<div class="card-header"><span class="card-title">False BEKLE Density</span><span class="card-badge badge-green">NORMAL</span></div>
+<div class="gauge-container">
+<div class="gauge-wrapper"><canvas id="gauge1"></canvas><div class="gauge-value green">2.1%</div></div>
+<div class="gauge-label">(GB 0.40 - 0.45 bandı)</div>
+<div class="gauge-thresholds">
+<span class="threshold-item"><span class="threshold-dot dot-green"></span>Normal: &lt;5%</span>
+<span class="threshold-item"><span class="threshold-dot dot-yellow"></span>Uyarı: 5-15%</span>
+<span class="threshold-item"><span class="threshold-dot dot-red"></span>Alarm: &gt;15%</span>
+</div>
+<div class="mini-chart-container"><canvas id="miniChart1"></canvas></div>
+</div>
+</div>
+
+<div class="card gauge-card">
+<div class="card-header"><span class="card-title">GB AL Ortalaması</span><span class="card-badge badge-green">NORMAL</span></div>
+<div class="gauge-container">
+<div class="gauge-wrapper"><canvas id="gauge2"></canvas><div class="gauge-value green">0.74</div></div>
+<div class="gauge-label">(Sadece AL sinyalleri)</div>
+<div class="gauge-thresholds">
+<span class="threshold-item"><span class="threshold-dot dot-green"></span>Normal: &gt;0.60</span>
+<span class="threshold-item"><span class="threshold-dot dot-yellow"></span>Uyarı: 0.50-0.60</span>
+<span class="threshold-item"><span class="threshold-dot dot-red"></span>Alarm: &lt;0.50</span>
+</div>
+<div class="mini-chart-container"><canvas id="miniChart2"></canvas></div>
+</div>
+</div>
+
+<div class="card gauge-card">
+<div class="card-header"><span class="card-title">AL Oranı (Bull)</span><span class="card-badge badge-green">NORMAL</span></div>
+<div class="gauge-container">
+<div class="gauge-wrapper"><canvas id="gauge3"></canvas><div class="gauge-value green">46%</div></div>
+<div class="gauge-label">(Bull günlerinde)</div>
+<div class="gauge-thresholds">
+<span class="threshold-item"><span class="threshold-dot dot-green"></span>Normal: %30-60</span>
+<span class="threshold-item"><span class="threshold-dot dot-yellow"></span>Uyarı: %20-30 veya %60-80</span>
+<span class="threshold-item"><span class="threshold-dot dot-red"></span>Alarm: &lt;%20 veya &gt;%80</span>
+</div>
+<div class="mini-chart-container"><canvas id="miniChart3"></canvas></div>
+</div>
+</div>
+
+<div class="card gauge-card">
+<div class="card-header"><span class="card-title">RF Guard Etkisi (Bear)</span><span class="card-badge badge-green">NORMAL</span></div>
+<div class="gauge-container">
+<div class="gauge-wrapper"><canvas id="gauge4"></canvas><div class="gauge-value green">12%</div></div>
+<div class="gauge-label">(Bear günlerinde engelleme oranı)</div>
+<div class="gauge-thresholds">
+<span class="threshold-item"><span class="threshold-dot dot-green"></span>Normal: %5-20</span>
+<span class="threshold-item"><span class="threshold-dot dot-yellow"></span>Uyarı: %20-35</span>
+<span class="threshold-item"><span class="threshold-dot dot-red"></span>Alarm: &gt;%35</span>
+</div>
+<div class="mini-chart-container"><canvas id="miniChart4"></canvas></div>
+</div>
+</div>
+
+<div class="card alarm-card">
+<div class="card-header"><span class="card-title">Sistem Alarmı</span><span class="card-badge badge-green">SAĞLIKLI</span></div>
+<div class="alarm-icon">✓</div>
+<div class="alarm-title">Alarm Yok</div>
+<div class="alarm-subtitle">Tüm metrikler normal aralıkta</div>
+</div>
+
+<!-- NEW: Experiment Counter -->
+<div class="card experiment-card">
+<div class="card-header"><span class="card-title">🧪 14 Gunluk Deney</span><span class="card-badge badge-blue">AKTIF</span></div>
+<div class="experiment-counter">
+<div class="experiment-days">8</div>
+<div class="experiment-label">Gun Tamamlandi</div>
+<div class="experiment-progress"><div class="experiment-progress-fill" style="width:57%"></div></div>
+<div class="experiment-days-text">Gun 8 / 14 — %57 tamamlandi</div>
+</div>
+</div>
+
+<!-- NEW: Canary List -->
+<div class="card canary-card">
+<div class="card-header"><span class="card-title">🚨 Canary Listesi</span><span class="card-badge badge-red">RISK</span></div>
+<div class="canary-list">
+<div class="canary-item">
+<div><div class="ticker" style="color:var(--accent-red)">RALYH</div><div class="canary-reason">v1=AL → v2=BEKLE | ATR_LIMIT</div></div>
+<div class="change up">+%10.0</div>
+</div>
+<div class="canary-item">
+<div><div class="ticker" style="color:var(--accent-red)">SANEL</div><div class="canary-reason">v1=AL → v2=BEKLE | ATR_LIMIT</div></div>
+<div class="change up">+%10.0</div>
+</div>
+</div>
+</div>
+
+<!-- NEW: New Opportunities -->
+<div class="card opportunities-card">
+<div class="card-header"><span class="card-title">🎯 Yeni Firsatlar</span><span class="card-badge badge-green">YENI</span></div>
+<div class="opportunities-list">
+<div class="opportunity-item">
+<div><div class="ticker" style="color:var(--accent-green);font-weight:600">ARCLK</div><div class="canary-reason">v1=BEKLE → v2=AL</div></div>
+<div style="display:flex;gap:6px"><span class="v1-tag">v1: BEKLE</span><span class="v2-tag">v2: AL</span></div>
+</div>
+<div class="opportunity-item">
+<div><div class="ticker" style="color:var(--accent-green);font-weight:600">TUPRS</div><div class="canary-reason">v1=BEKLE → v2=AL</div></div>
+<div style="display:flex;gap:6px"><span class="v1-tag">v1: BEKLE</span><span class="v2-tag">v2: AL</span></div>
+</div>
+<div class="opportunity-item">
+<div><div class="ticker" style="color:var(--accent-green);font-weight:600">GARAN</div><div class="canary-reason">v1=BEKLE → v2=AL</div></div>
+<div style="display:flex;gap:6px"><span class="v1-tag">v1: BEKLE</span><span class="v2-tag">v2: AL</span></div>
+</div>
+</div>
+</div>
+
+<!-- SIGNAL & REGIME PIES -->
+<div class="card signal-card">
+<div class="card-header"><span class="card-title">Sinyal Dagilimi (5 Gun)</span></div>
+<div class="pie-container">
+<div class="pie-chart-wrapper"><canvas id="signalPie"></canvas><div class="pie-center-text"><div class="number">64</div><div class="label">Toplam</div></div></div>
+<div class="pie-legend">
+<div class="legend-item"><span class="legend-dot" style="background:var(--accent-green)"></span><span>AL</span><span class="legend-value" style="color:var(--accent-green)">87.5% (56)</span></div>
+<div class="legend-item"><span class="legend-dot" style="background:var(--accent-red)"></span><span>BEKLE</span><span class="legend-value" style="color:var(--accent-red)">12.5% (8)</span></div>
+<div class="legend-item"><span class="legend-dot" style="background:var(--text-muted)"></span><span>DIGER</span><span class="legend-value" style="color:var(--text-muted)">0% (0)</span></div>
+</div>
+</div>
+</div>
+
+<div class="card signal-card">
+<div class="card-header"><span class="card-title">Rejim Dagilimi (5 Gun)</span></div>
+<div class="pie-container">
+<div class="pie-chart-wrapper"><canvas id="regimePie"></canvas><div class="pie-center-text"><div class="number">54</div><div class="label">Toplam</div></div></div>
+<div class="pie-legend">
+<div class="legend-item"><span class="legend-dot" style="background:var(--accent-green)"></span><span>BULL</span><span class="legend-value" style="color:var(--accent-green)">62% (31)</span></div>
+<div class="legend-item"><span class="legend-dot" style="background:var(--accent-red)"></span><span>BEAR</span><span class="legend-value" style="color:var(--accent-red)">25% (16)</span></div>
+<div class="legend-item"><span class="legend-dot" style="background:var(--accent-yellow)"></span><span>SIDEWAYS</span><span class="legend-value" style="color:var(--accent-yellow)">13% (7)</span></div>
+</div>
+</div>
+</div>
+
+<div class="card regime-perf-card">
+<div class="card-header"><span class="card-title">Rejim Bazli Performans</span><span style="font-size:10px;color:var(--text-muted)">Ortalama 1G Getiri %</span></div>
+<div class="bar-chart-container"><canvas id="regimePerf"></canvas></div>
+</div>
+
+<div class="card daily-pnl-card">
+<div class="card-header"><span class="card-title">Gunluk PnL (1G)</span><span style="font-size:10px;color:var(--text-muted)">Toplam (Son 5 Gun)</span></div>
+<div style="text-align:center;margin-bottom:10px"><span style="font-size:32px;font-weight:800;color:var(--accent-green)">+2.34%</span></div>
+<div class="bar-chart-container"><canvas id="dailyPnl"></canvas></div>
+</div>
+
+<!-- NEW: Equity Curve -->
+<div class="card equity-curve-card">
+<div class="card-header"><span class="card-title">📈 Equity Curve</span><span style="font-size:11px;color:var(--accent-green);font-weight:600">+19.4% (30g)</span></div>
+<div class="chart-container"><canvas id="equityCurve"></canvas></div>
+</div>
+
+<!-- NEW: Performance Comparison -->
+<div class="card perf-compare-card">
+<div class="card-header"><span class="card-title">🏆 v1 vs v2 Performans Karsilastirmasi</span><span style="font-size:10px;color:var(--text-muted)">14 Gunluk Deney</span></div>
+<div class="perf-metric-row">
+<span class="perf-metric-label">Toplam Getiri</span>
+<div class="perf-metric-values">
+<div class="perf-value-group"><div class="label">v1 (Eski)</div><div class="value v1">+5.82%</div></div>
+<div class="perf-value-group"><div class="label">v2 (Yeni)</div><div class="value v2">+7.31%</div></div>
+<div class="perf-value-group"><div class="label">Benchmark</div><div class="value benchmark">+1.92%</div></div>
+<span class="perf-diff positive">+1.49%</span>
+</div>
+</div>
+<div class="perf-metric-row">
+<span class="perf-metric-label">Risk Azaltma (Drawdown)</span>
+<div class="perf-metric-values">
+<div class="perf-value-group"><div class="label">v1</div><div class="value v1">-%12.4</div></div>
+<div class="perf-value-group"><div class="label">v2</div><div class="value v2">-%9.4</div></div>
+<span class="perf-diff positive">-%24 Iyilesme</span>
+</div>
+</div>
+<div class="perf-metric-row">
+<span class="perf-metric-label">AL Precision</span>
+<div class="perf-metric-values">
+<div class="perf-value-group"><div class="label">v1</div><div class="value v1">0.42</div></div>
+<div class="perf-value-group"><div class="label">v2</div><div class="value v2">0.52</div></div>
+<span class="perf-diff positive">+%23.8</span>
+</div>
+</div>
+<div class="perf-metric-row">
+<span class="perf-metric-label">Anlasma Orani</span>
+<div class="perf-metric-values">
+<div class="perf-value-group"><div class="label">v1 ↔ v2</div><div class="value benchmark">93.6%</div></div>
+<div class="perf-value-group"><div class="label">Yeni Firsatlar</div><div class="value v2">13 hisse</div></div>
+</div>
+</div>
+</div>
+
+<!-- NEW: Confusion Matrix -->
+<div class="card confusion-card">
+<div class="card-header"><span class="card-title">📦 Confusion Matrix</span><span style="font-size:10px;color:var(--text-muted)">Son 5 Gun</span></div>
+<div class="confusion-matrix">
+<div></div><div class="confusion-header">Pred: AL</div><div class="confusion-header">Pred: BEKLE</div><div class="confusion-header">Pred: SAT</div>
+<div class="confusion-label">True: AL</div><div class="confusion-cell cm-correct">42</div><div class="confusion-cell cm-wrong">8</div><div class="confusion-cell cm-wrong">3</div>
+<div class="confusion-label">True: BEKLE</div><div class="confusion-cell cm-wrong">5</div><div class="confusion-cell cm-correct">12</div><div class="confusion-cell cm-neutral">2</div>
+<div class="confusion-label">True: SAT</div><div class="confusion-cell cm-wrong">2</div><div class="confusion-cell cm-neutral">1</div><div class="confusion-cell cm-correct">8</div>
+</div>
+<div style="margin-top:12px;font-size:10px;color:var(--text-muted);text-align:center">Dogru: 0.519 | Precision(AL): 0.50 | Recall(AL): 0.75</div>
+</div>
+
+<!-- NEW: ATR/Liquidity Filtered -->
+<div class="card filtered-card">
+<div class="card-header"><span class="card-title">⚠️ Filtrelenen Hisseler</span><span style="font-size:10px;color:var(--text-muted)">Model AL dedi ama elendi</span></div>
+<div class="filtered-tabs">
+<button class="filtered-tab active" onclick="switchTab(this,'atr')">ATR_LIMIT</button>
+<button class="filtered-tab" onclick="switchTab(this,'liquidity')">Likidite</button>
+<button class="filtered-tab" onclick="switchTab(this,'guard')">RF_GUARD</button>
+</div>
+<table class="signal-table" id="filteredTable">
+<thead><tr><th>Ticker</th><th>GB Proba</th><th>ATR%</th><th>Kacirilan Getiri</th><th>Reason</th></tr></thead>
+<tbody id="atrBody">
+<tr><td class="ticker-cell" style="color:var(--accent-red)">RALYH</td><td><span style="color:var(--accent-green);font-weight:600">0.90</span></td><td>8.4%</td><td><span style="color:var(--accent-green)">+%10.0</span></td><td class="reason-text">ATR > %7 limit</td></tr>
+<tr><td class="ticker-cell" style="color:var(--accent-red)">SANEL</td><td><span style="color:var(--accent-green);font-weight:600">0.67</span></td><td>7.2%</td><td><span style="color:var(--accent-green)">+%10.0</span></td><td class="reason-text">ATR > %7 limit</td></tr>
+<tr><td class="ticker-cell" style="color:var(--accent-red)">KONTR</td><td><span style="color:var(--accent-yellow);font-weight:600">0.58</span></td><td>9.1%</td><td><span style="color:var(--accent-green)">+%6.5</span></td><td class="reason-text">ATR > %7 limit</td></tr>
+</tbody>
+<tbody id="liquidityBody" style="display:none">
+<tr><td class="ticker-cell" style="color:var(--accent-red)">XYZ</td><td>0.72</td><td>3.2%</td><td>—</td><td class="reason-text">Hacim < 1M TL</td></tr>
+</tbody>
+<tbody id="guardBody" style="display:none">
+<tr><td class="ticker-cell" style="color:var(--accent-red)">ALBRK</td><td>0.674</td><td>4.1%</td><td>—</td><td class="reason-text">RF Guard (Bear)</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- Signal Table -->
+<div class="card signal-table-card">
+<div class="card-header"><span class="card-title">Son 10 Sinyal</span></div>
+<table class="signal-table">
+<thead>
+<tr><th>Tarih</th><th>Ticker</th><th>Rejim</th><th>Esik</th><th>GB Proba</th><th>RF Proba</th><th>Guard</th><th>Sinyal</th><th>Reason</th></tr>
+</thead>
+<tbody>
+<tr><td>2026-06-29</td><td class="ticker-cell">ACSEL</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:73.4%"></div></div><span>0.734</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-29</td><td class="ticker-cell">ALBRK</td><td><span class="regime-badge regime-bear">bear</span></td><td>0.55</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:67.4%"></div></div><span>0.674</span></div></td><td>0.301</td><td><span style="color:var(--accent-red);font-weight:600">True</span></td><td><span class="signal-badge signal-bekle">BEKLE</span></td><td class="reason-text" style="color:var(--accent-red)">RF_GUARD</td></tr>
+<tr><td>2026-06-29</td><td class="ticker-cell">ASTOR</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:81.2%"></div></div><span>0.812</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-29</td><td class="ticker-cell">AKBNK</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:65.1%"></div></div><span>0.651</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-29</td><td class="ticker-cell">THYAO</td><td><span class="regime-badge regime-sideways">sideways</span></td><td>0.45</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill medium" style="width:43.2%"></div></div><span>0.432</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-bekle">BEKLE</span></td><td class="reason-text">GB_LOW</td></tr>
+<tr><td>2026-06-28</td><td class="ticker-cell">DOFRB</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:74%"></div></div><span>0.740</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-28</td><td class="ticker-cell">TRHOL</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:78%"></div></div><span>0.780</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-28</td><td class="ticker-cell">KARTN</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:73%"></div></div><span>0.730</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-28</td><td class="ticker-cell">VESTL</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill medium" style="width:41%"></div></div><span>0.410</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+<tr><td>2026-06-28</td><td class="ticker-cell">SDTTR</td><td><span class="regime-badge regime-bull">bull</span></td><td>0.40</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill high" style="width:71%"></div></div><span>0.710</span></div></td><td>-</td><td>False</td><td><span class="signal-badge signal-al">AL</span></td><td class="reason-text">GB_PASS</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- NEW: Precision/Recall Trend -->
+<div class="card pr-trend-card">
+<div class="card-header"><span class="card-title">📉 Precision, Recall & F1 Trend</span><span style="font-size:10px;color:var(--text-muted)">Son 14 Gun — AL Sinifi</span></div>
+<div class="chart-container"><canvas id="prTrend"></canvas></div>
+</div>
+
+<!-- GB Proba Distribution -->
+<div class="card proba-dist-card">
+<div class="card-header"><span class="card-title">GB Proba Dagilimi (5 Gun)</span><span style="font-size:11px;color:var(--accent-green);font-weight:600">Ortalama: 0.47</span></div>
+<div class="bar-chart-container" style="height:200px"><canvas id="probaDist"></canvas></div>
+</div>
+
+<!-- Metrics Trend -->
+<div class="card metrics-trend-card">
+<div class="card-header"><span class="card-title">Metrik Trend Ozeti (5 Gun)</span></div>
+<table class="trend-table">
+<tbody>
+<tr><td class="trend-metric">False BEKLE Density</td><td><div class="trend-sparkline"><canvas id="trend1"></canvas></div></td><td><span class="trend-status status-normal">● NORMAL</span></td></tr>
+<tr><td class="trend-metric">GB AL Ortalamasi</td><td><div class="trend-sparkline"><canvas id="trend2"></canvas></div></td><td><span class="trend-status status-normal">● NORMAL</span></td></tr>
+<tr><td class="trend-metric">AL Orani (Bull)</td><td><div class="trend-sparkline"><canvas id="trend3"></canvas></div></td><td><span class="trend-status status-normal">● NORMAL</span></td></tr>
+<tr><td class="trend-metric">RF Guard Etkisi (Bear)</td><td><div class="trend-sparkline"><canvas id="trend4"></canvas></div></td><td><span class="trend-status status-normal">● NORMAL</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+<div class="footer-left">
+<span>NOT: Tum oranlar ilgili rejimdeki adaylar uzerinden hesaplanir.</span>
+<span>False BEKLE = GB proba 0.40-0.45 bandinda olup BEKLE edilen sinyaller.</span>
+</div>
+<div class="footer-right">
+<span>Veri kaynagi: BIST & Sistem Loglari</span>
+</div>
+</div>
+</div>
+
+<script>
+const charts = {};
+
+function createGauge(canvasId, value, max, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [value, max - value], backgroundColor: [color, 'rgba(30,41,59,0.8)'], borderWidth: 0, cutout: '75%', circumference: 180, rotation: 270, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+}
+
+function createSparkline(canvasId, data, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: ['5G', '4G', '3G', '2G', '1G'], datasets: [{ data: data, borderColor: color, backgroundColor: color + '20', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+  });
+}
+
+function createOrUpdatePie(canvasId, labels, data, colors, centerNum, centerLabel, legendData) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (charts[canvasId]) { charts[canvasId].destroy(); }
+  charts[canvasId] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 0, cutout: '65%', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+  const wrapper = document.getElementById(canvasId).closest('.pie-chart-wrapper');
+  if (wrapper) {
+    wrapper.querySelector('.pie-center-text .number').textContent = centerNum;
+    wrapper.querySelector('.pie-center-text .label').textContent = centerLabel;
+  }
+  const legendContainer = document.getElementById(canvasId).closest('.pie-container').querySelector('.pie-legend');
+  if (legendContainer && legendData) {
+    legendContainer.innerHTML = legendData.map((l, i) =>
+      `<div class="legend-item"><span class="legend-dot" style="background:${colors[i]}"></span><span>${l.label}</span><span class="legend-value" style="color:${colors[i]}">${l.value}</span></div>`
+    ).join('');
+  }
+}
+
+function createOrUpdateBar(canvasId, labels, data, colors, label) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (charts[canvasId]) { charts[canvasId].destroy(); }
+  charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: label || '', data: data, backgroundColor: colors || '#22c55e', borderRadius: 6, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,49,66,0.5)' }, ticks: { color: '#64748b', font: { size: 10 } } }, x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } } } }
+  });
+}
+
+function createOrUpdateLine(canvasId, datasets, options) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (charts[canvasId]) { charts[canvasId].destroy(); }
+  charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: options.labels || [], datasets: datasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true } } }, scales: { y: { grid: { color: 'rgba(42,49,66,0.5)' }, ticks: { color: '#64748b', font: { size: 10 } } }, x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } } } }
+  });
+}
+
+function updateHeader(metrics) {
+  const header = document.querySelector('.header-right');
+  if (!header) return;
+  const stats = header.querySelectorAll('.header-stat');
+  if (stats.length >= 6) {
+    const healthEl = stats[0].querySelector('.value');
+    healthEl.textContent = metrics.system_health || 'BILINMIYOR';
+    healthEl.className = 'value ' + (metrics.system_health === 'SAGLIKLI' ? 'health' : '');
+    stats[1].querySelector('.value').textContent = metrics.date || '-';
+    stats[2].querySelector('.value').textContent = metrics.data_range || '-';
+    stats[3].querySelector('.value').textContent = metrics.last_update || '-';
+    stats[4].querySelector('.value').textContent = metrics.model_version || '-';
+    stats[5].querySelector('.value').textContent = metrics.strategy || '-';
+  }
+}
+
+function updateExperiment(metrics) {
+  const day = metrics.experiment_day || 0;
+  const total = metrics.experiment_total || 14;
+  const daysEl = document.querySelector('.experiment-days');
+  const progressEl = document.querySelector('.experiment-progress-fill');
+  const textEl = document.querySelector('.experiment-days-text');
+  if (daysEl) daysEl.textContent = day;
+  if (progressEl) progressEl.style.width = (day / total * 100) + '%';
+  if (textEl) textEl.textContent = `Gun ${day} / ${total} — %${Math.round(day / total * 100)} tamamlandi`;
+}
+
+function updateSignalPie(signals) {
+  const counts = { AL: 0, BEKLE: 0, SAT: 0, DIGER: 0 };
+  signals.forEach(s => { if (counts[s.decision] !== undefined) counts[s.decision]++; else counts.DIGER++; });
+  const total2 = signals.length;
+  const alPct = total2 ? Math.round(counts.AL / total2 * 1000) / 10 : 0;
+  const beklePct = total2 ? Math.round(counts.BEKLE / total2 * 1000) / 10 : 0;
+  const digerPct = total2 ? Math.round((total2 - counts.AL - counts.BEKLE) / total2 * 1000) / 10 : 0;
+  createOrUpdatePie('signalPie', ['AL', 'BEKLE', 'DIGER'], [alPct, beklePct, digerPct], ['#22c55e', '#ef4444', '#64748b'],
+    total2, 'Toplam', [
+      { label: 'AL', value: `%${alPct} (${counts.AL})` },
+      { label: 'BEKLE', value: `%${beklePct} (${counts.BEKLE})` },
+      { label: 'DIGER', value: `%${digerPct} (${total2 - counts.AL - counts.BEKLE})` }
+    ]);
+}
+
+function updateCanary(canary) {
+  const list = document.querySelector('.canary-list');
+  if (!list) return;
+  if (!canary || canary.length === 0) {
+    list.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:12px;text-align:center">Canary verisi yok</div>';
+    return;
+  }
+  list.innerHTML = canary.map(c =>
+    `<div class="canary-item"><div><div class="ticker" style="color:var(--accent-red)">${c.ticker}</div><div class="canary-reason">v1=${c.v1 || '?'} → v2=${c.v2 || '?'} | ${c.reason || '-'}</div></div><div class="change up">${c.change_pct != null ? '+%' + c.change_pct : '-'}</div></div>`
+  ).join('');
+}
+
+function updateOpportunities(opps) {
+  const list = document.querySelector('.opportunities-list');
+  if (!list) return;
+  if (!opps || opps.length === 0) {
+    list.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:12px;text-align:center">Yeni firsat yok</div>';
+    return;
+  }
+  list.innerHTML = opps.map(o =>
+    `<div class="opportunity-item"><div><div class="ticker" style="color:var(--accent-green);font-weight:600">${o.ticker}</div><div class="canary-reason">v1=${o.v1 || '?'} → v2=${o.v2 || '?'}</div></div><div style="display:flex;gap:6px"><span class="v1-tag">v1: ${o.v1 || '?'}</span><span class="v2-tag">v2: ${o.v2 || '?'}</span></div></div>`
+  ).join('');
+}
+
+function updateFiltered(filtered) {
+  ['atr', 'liquidity', 'guard'].forEach(type => {
+    const body = document.getElementById(type + 'Body');
+    if (!body) return;
+    const items = filtered ? (filtered[type + '_limit'] || filtered[type] || []) : [];
+    if (items.length === 0) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px">Veri yok</td></tr>';
+      return;
+    }
+    body.innerHTML = items.map(item =>
+      `<tr><td class="ticker-cell" style="color:var(--accent-red)">${item.ticker}</td><td><span style="color:var(--accent-green);font-weight:600">${item.gb ? item.gb.toFixed(2) : '-'}</span></td><td>${item.atr_pct != null ? '%' + item.atr_pct : (item.reason || '-')}</td><td>${item.kacirilan_getiri != null ? '<span style="color:var(--accent-green)">+%' + item.kacirilan_getiri + '</span>' : '—'}</td><td class="reason-text">${item.reason || '-'}</td></tr>`
+    ).join('');
+  });
+}
+
+function updateSignalTable(signals) {
+  const tbody = document.querySelector('.signal-table-card tbody');
+  if (!tbody) return;
+  const top10 = signals.slice(0, 10);
+  if (top10.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:16px">Sinyal verisi yok</td></tr>';
+    return;
+  }
+  tbody.innerHTML = top10.map(s => {
+    const gb = s.gb || 0;
+    const regimeClass = 'regime-' + (s.regime || 'sideways');
+    const signalClass = 'signal-' + (s.decision === 'AL' ? 'al' : s.decision === 'SAT' ? 'sat' : 'bekle');
+    const gbPct = (gb * 100).toFixed(0);
+    const probaClass = gb >= 0.6 ? 'high' : gb >= 0.4 ? 'medium' : 'low';
+    const dateStr = s.tarih || s.date || '-';
+    return `<tr><td>${dateStr}</td><td class="ticker-cell">${s.ticker}</td><td><span class="regime-badge ${regimeClass}">${s.regime || '-'}</span></td><td>${s.esik != null ? s.esik.toFixed(2) : '-'}</td><td><div class="proba-bar"><div class="proba-track"><div class="proba-fill ${probaClass}" style="width:${gbPct}%"></div></div><span>${gb.toFixed(3)}</span></div></td><td>${s.rf != null ? s.rf.toFixed(3) : '-'}</td><td>${s.guard ? '<span style="color:var(--accent-red);font-weight:600">True</span>' : 'False'}</td><td><span class="signal-badge ${signalClass}">${s.decision}</span></td><td class="reason-text">${s.reason || ''}</td></tr>`;
+  }).join('');
+}
+
+function updatePerformance(perf) {
+  const rows = document.querySelectorAll('.perf-metric-row');
+  if (!rows || rows.length < 4) return;
+  const v1r = perf.v1_return || 0; const v2r = perf.v2_return || 0; const bm = perf.benchmark || 0;
+  rows[0].querySelector('.value.v1').textContent = (v1r >= 0 ? '+' : '') + v1r.toFixed(2) + '%';
+  rows[0].querySelector('.value.v2').textContent = (v2r >= 0 ? '+' : '') + v2r.toFixed(2) + '%';
+  rows[0].querySelector('.value.benchmark').textContent = (bm >= 0 ? '+' : '') + bm.toFixed(2) + '%';
+  const diff0 = v2r - v1r;
+  const diffEl0 = rows[0].querySelector('.perf-diff');
+  diffEl0.textContent = (diff0 >= 0 ? '+' : '') + diff0.toFixed(2) + '%';
+  diffEl0.className = 'perf-diff ' + (diff0 >= 0 ? 'positive' : 'negative');
+  const v1dd = perf.v1_drawdown || 0; const v2dd = perf.v2_drawdown || 0;
+  rows[1].querySelector('.value.v1').textContent = '%' + v1dd.toFixed(1);
+  rows[1].querySelector('.value.v2').textContent = '%' + v2dd.toFixed(1);
+  const ddImpr = v2dd !== 0 ? Math.round((1 - v2dd / v1dd) * 100) : 0;
+  const diffEl1 = rows[1].querySelector('.perf-diff');
+  diffEl1.textContent = '%' + ddImpr + ' Iyilesme';
+  diffEl1.className = 'perf-diff positive';
+  const v1p = perf.v1_precision || 0; const v2p = perf.v2_precision || 0;
+  rows[2].querySelector('.value.v1').textContent = v1p.toFixed(2);
+  rows[2].querySelector('.value.v2').textContent = v2p.toFixed(2);
+  const precDiff = v1p > 0 ? Math.round((v2p - v1p) / v1p * 100) : 0;
+  const diffEl2 = rows[2].querySelector('.perf-diff');
+  diffEl2.textContent = (precDiff >= 0 ? '+' : '') + '%' + precDiff;
+  diffEl2.className = 'perf-diff ' + (precDiff >= 0 ? 'positive' : 'negative');
+  const agr = perf.agreement_pct || 0; const newOpp = perf.new_opportunities || 0;
+  rows[3].querySelector('.value.benchmark').textContent = '%' + agr.toFixed(1);
+  rows[3].querySelector('.value.v2').textContent = newOpp + ' hisse';
+}
+
+function updateConfusion(conf) {
+  if (!conf || !conf.matrix) return;
+  const m = conf.matrix;
+  const cells = document.querySelectorAll('.confusion-cell');
+  if (cells.length >= 9) {
+    cells[0].textContent = m[0] ? m[0][0] : 0;
+    cells[1].textContent = m[0] ? m[0][1] : 0;
+    cells[2].textContent = m[0] ? m[0][2] : 0;
+    cells[3].textContent = m[1] ? m[1][0] : 0;
+    cells[4].textContent = m[1] ? m[1][1] : 0;
+    cells[5].textContent = m[1] ? m[1][2] : 0;
+    cells[6].textContent = m[2] ? m[2][0] : 0;
+    cells[7].textContent = m[2] ? m[2][1] : 0;
+    cells[8].textContent = m[2] ? m[2][2] : 0;
+  }
+  const footer = document.querySelector('.confusion-card div[style*="margin-top"]');
+  if (footer) {
+    footer.textContent = `Dogru: ${(conf.accuracy || 0).toFixed(3)} | Precision(AL): ${(conf.precision_al || 0).toFixed(2)} | Recall(AL): ${(conf.recall_al || 0).toFixed(2)}`;
+  }
+}
+
+function updateAlarm(metrics) {
+  const alarmIcon = document.querySelector('.alarm-icon');
+  const alarmTitle = document.querySelector('.alarm-title');
+  const alarmBadge = document.querySelector('.alarm-card .card-badge');
+  if (!alarmIcon) return;
+  const healthy = metrics.system_health === 'SAGLIKLI';
+  alarmIcon.textContent = healthy ? '\u2713' : '!';
+  alarmIcon.style.background = healthy ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+  alarmIcon.style.borderColor = healthy ? 'var(--accent-green)' : 'var(--accent-red)';
+  alarmTitle.textContent = healthy ? 'Alarm Yok' : 'SORUN VAR';
+  alarmTitle.style.color = healthy ? 'var(--accent-green)' : 'var(--accent-red)';
+  if (alarmBadge) {
+    alarmBadge.textContent = healthy ? 'SAGLIKLI' : 'UYARI';
+    alarmBadge.className = 'card-badge ' + (healthy ? 'badge-green' : 'badge-red');
+  }
+}
+
+function updateGauges(metrics, signals) {
+  const alSignals = signals.filter(s => s.decision === 'AL');
+  const gbAlVals = alSignals.map(s => s.gb || 0).filter(v => v > 0);
+  const gbAlAvg = gbAlVals.length ? gbAlVals.reduce((a, b) => a + b, 0) / gbAlVals.length : 0;
+
+  const bullSignals = signals.filter(s => s.regime === 'bull');
+  const bullAl = bullSignals.filter(s => s.decision === 'AL');
+  const alOran = bullSignals.length ? Math.round(bullAl.length / bullSignals.length * 100) : 0;
+
+  const bearSignals = signals.filter(s => s.regime === 'bear');
+  const bearAl = bearSignals.filter(s => s.decision === 'AL');
+  const guardCount = bearSignals.filter(s => s.guard).length;
+  const rfGuardPct = bearSignals.length ? Math.round(guardCount / bearSignals.length * 100) : 0;
+
+  const falseBekle = signals.filter(s => s.decision === 'BEKLE' && s.gb >= 0.40 && s.gb <= 0.45);
+  const fbDensity = signals.length ? Math.round(falseBekle.length / signals.length * 1000) / 10 : 0;
+
+  if (charts['gauge1']) { charts['gauge1'].destroy(); }
+  if (charts['gauge2']) { charts['gauge2'].destroy(); }
+  if (charts['gauge3']) { charts['gauge3'].destroy(); }
+  if (charts['gauge4']) { charts['gauge4'].destroy(); }
+  createGauge('gauge1', Math.min(fbDensity, 20), 20, fbDensity < 5 ? '#22c55e' : fbDensity < 15 ? '#eab308' : '#ef4444');
+  createGauge('gauge2', Math.min(gbAlAvg * 100, 100), 100, gbAlAvg > 0.6 ? '#22c55e' : gbAlAvg > 0.5 ? '#eab308' : '#ef4444');
+  createGauge('gauge3', alOran, 100, (alOran >= 30 && alOran <= 60) ? '#22c55e' : '#eab308');
+  createGauge('gauge4', rfGuardPct, 50, rfGuardPct < 20 ? '#22c55e' : rfGuardPct < 35 ? '#eab308' : '#ef4444');
+
+  const gv1 = document.querySelector('.gauge-card:nth-child(1) .gauge-value'); if (gv1) { gv1.textContent = fbDensity + '%'; gv1.className = 'gauge-value ' + (fbDensity < 5 ? 'green' : fbDensity < 15 ? 'yellow' : 'red'); }
+  const gv2 = document.querySelector('.gauge-card:nth-child(2) .gauge-value'); if (gv2) { gv2.textContent = gbAlAvg.toFixed(2); gv2.className = 'gauge-value ' + (gbAlAvg > 0.6 ? 'green' : gbAlAvg > 0.5 ? 'yellow' : 'red'); }
+  const gv3 = document.querySelector('.gauge-card:nth-child(3) .gauge-value'); if (gv3) { gv3.textContent = alOran + '%'; gv3.className = 'gauge-value ' + ((alOran >= 30 && alOran <= 60) ? 'green' : 'yellow'); }
+  const gv4 = document.querySelector('.gauge-card:nth-child(4) .gauge-value'); if (gv4) { gv4.textContent = rfGuardPct + '%'; gv4.className = 'gauge-value ' + (rfGuardPct < 20 ? 'green' : rfGuardPct < 35 ? 'yellow' : 'red'); }
+}
+
+function updateRegimePerf(signals) {
+  const regimes = { bull: [], bear: [], sideways: [] };
+  signals.forEach(s => { if (regimes[s.regime]) regimes[s.regime].push(s.getiri_1g || 0); });
+  const labels = ['BULL', 'BEAR', 'SIDEWAYS'];
+  const data = labels.map(r => {
+    const vals = regimes[r.toLowerCase()];
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  });
+  const colors = ['#22c55e', '#ef4444', '#eab308'];
+  createOrUpdateBar('regimePerf', labels, data, colors);
+}
+
+function updateDailyPnl(signals) {
+  const dailyPnls = {};
+  signals.forEach(s => {
+    const date = s.tarih || s.date || 'bugun';
+    if (!dailyPnls[date]) dailyPnls[date] = [];
+    dailyPnls[date].push(s.getiri_1g || 0);
+  });
+  const sortedDates = Object.keys(dailyPnls).sort().slice(-5);
+  const labels = sortedDates.map(d => d.slice(-5));
+  const data = sortedDates.map(d => {
+    const vals = dailyPnls[d];
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  });
+  const colors = data.map(v => v >= 0 ? '#22c55e' : '#ef4444');
+  const totalPnl = data.reduce((a, b) => a + b, 0);
+  const totalEl = document.querySelector('.daily-pnl-card div[style*="text-align:center"] span');
+  if (totalEl) totalEl.textContent = (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2) + '%';
+  createOrUpdateBar('dailyPnl', labels, data, colors);
+}
+
+function updateEquity(equity) {
+  if (!equity || !equity.portfolio_values) return;
+  const pv = equity.portfolio_values;
+  const bv = equity.benchmark_values || [];
+  const dates = equity.dates || pv.map((_, i) => 'Gun ' + (i + 1));
+  const lastVal = pv[pv.length - 1] || 0;
+  const firstVal = pv[0] || 1;
+  const totalReturn = ((lastVal - firstVal) / firstVal * 100).toFixed(1);
+  const titleEl = document.querySelector('.equity-curve-card .card-header span:last-child');
+  if (titleEl) titleEl.textContent = '+' + totalReturn + '% (' + dates.length + 'g)';
+  createOrUpdateLine('equityCurve', [
+    { label: 'Portfoy Degeri', data: pv, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#22c55e' },
+    { label: 'Benchmark (BIST100)', data: bv.length ? bv : pv.map(() => 100000), borderColor: '#3b82f6', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5, 5], tension: 0.4, pointRadius: 0 }
+  ], { labels: dates });
+}
+
+function updatePrTrend(prf) {
+  if (!prf || !prf.days) return;
+  createOrUpdateLine('prTrend', [
+    { label: 'Precision', data: prf.precision || [], borderColor: '#22c55e', backgroundColor: 'transparent', borderWidth: 2, tension: 0.4, pointRadius: 3 },
+    { label: 'Recall', data: prf.recall || [], borderColor: '#3b82f6', backgroundColor: 'transparent', borderWidth: 2, tension: 0.4, pointRadius: 3 },
+    { label: 'F1', data: prf.f1 || [], borderColor: '#eab308', backgroundColor: 'transparent', borderWidth: 2, tension: 0.4, pointRadius: 3 }
+  ], { labels: prf.days });
+}
+
+function updateProbaDist(signals) {
+  const bins = [0, 0, 0, 0, 0, 0, 0];
+  const labels = ['0-0.2', '0.2-0.4', '0.4-0.5', '0.5-0.6', '0.6-0.7', '0.7-0.8', '0.8-1.0'];
+  const gbVals = signals.map(s => s.gb || 0).filter(v => v > 0);
+  gbVals.forEach(v => {
+    if (v <= 0.2) bins[0]++; else if (v <= 0.4) bins[1]++; else if (v <= 0.5) bins[2]++; else if (v <= 0.6) bins[3]++; else if (v <= 0.7) bins[4]++; else if (v <= 0.8) bins[5]++; else bins[6]++;
+  });
+  const avg = gbVals.length ? gbVals.reduce((a, b) => a + b, 0) / gbVals.length : 0;
+  const titleEl = document.querySelector('.proba-dist-card .card-header span:last-child');
+  if (titleEl) titleEl.textContent = 'Ortalama: ' + avg.toFixed(2);
+  createOrUpdateBar('probaDist', labels, bins, '#22c55e');
+}
+
+function updateTrendSparklines(signals) {
+  const gbVals = signals.map(s => s.gb || 0).filter(v => v > 0);
+  const avgGb = gbVals.length ? gbVals.reduce((a, b) => a + b, 0) / gbVals.length : 0;
+  const alSignals = signals.filter(s => s.decision === 'AL');
+  const falseBekle = signals.filter(s => s.decision === 'BEKLE' && s.gb >= 0.40 && s.gb <= 0.45);
+  const fbDensity = signals.length ? falseBekle.length / signals.length * 100 : 0;
+
+  const guardCount = signals.filter(s => s.guard).length;
+  const bearSignals = signals.filter(s => s.regime === 'bear');
+  const guardPct = bearSignals.length ? guardCount / bearSignals.length * 100 : 0;
+
+  const bullSignals = signals.filter(s => s.regime === 'bull');
+  const bullAl = bullSignals.filter(s => s.decision === 'AL');
+  const alOran = bullSignals.length ? bullAl.length / bullSignals.length * 100 : 0;
+
+  createSparkline('trend1', [fbDensity, fbDensity, fbDensity, fbDensity, fbDensity], '#22c55e');
+  createSparkline('trend2', [avgGb, avgGb, avgGb, avgGb, avgGb], '#22c55e');
+  createSparkline('trend3', [alOran, alOran, alOran, alOran, alOran], '#22c55e');
+  createSparkline('trend4', [guardPct, guardPct, guardPct, guardPct, guardPct], '#22c55e');
+}
+
+async function fetchAllData() {
+  try {
+    const [metrics, signals, performance, canary, opportunities, filtered, equity, confusion, prf] = await Promise.all([
+      fetch('/api/metrics').then(r => r.json()).catch(() => ({})),
+      fetch('/api/signals').then(r => r.json()).catch(() => []),
+      fetch('/api/performance').then(r => r.json()).catch(() => ({})),
+      fetch('/api/canary').then(r => r.json()).catch(() => []),
+      fetch('/api/opportunities').then(r => r.json()).catch(() => []),
+      fetch('/api/filtered').then(r => r.json()).catch(() => ({})),
+      fetch('/api/equity').then(r => r.json()).catch(() => ({})),
+      fetch('/api/confusion').then(r => r.json()).catch(() => ({})),
+      fetch('/api/prf_trend').then(r => r.json()).catch(() => ({}))
+    ]);
+    updateHeader(metrics);
+    updateExperiment(metrics);
+    updateAlarm(metrics);
+    if (Array.isArray(signals) && signals.length > 0) {
+      updateSignalPie(signals);
+      updateGauges(metrics, signals);
+      updateRegimePerf(signals);
+      updateDailyPnl(signals);
+      updateSignalTable(signals);
+      updateProbaDist(signals);
+      updateTrendSparklines(signals);
+    }
+    updateCanary(canary);
+    updateOpportunities(opportunities);
+    updateFiltered(filtered);
+    updatePerformance(performance);
+    updateConfusion(confusion);
+    updateEquity(equity);
+    updatePrTrend(prf);
+  } catch (e) {
+    console.log('Veri yuklenirken hata:', e);
+  }
+}
+
+function switchTab(btn, type) {
+  document.querySelectorAll('.filtered-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('atrBody').style.display = 'none';
+  document.getElementById('liquidityBody').style.display = 'none';
+  document.getElementById('guardBody').style.display = 'none';
+  document.getElementById(type + 'Body').style.display = 'table-row-group';
+}
+
+fetchAllData();
+setInterval(fetchAllData, 300000);
+</script>
+</body>
+</html>

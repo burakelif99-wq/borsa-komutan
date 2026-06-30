@@ -1,214 +1,221 @@
-# scheduler.py - Zamanlanmış veri çekme ve raporlama
+"""
+scheduler.py - Borsa Komutan v4.0
+Basit zamanlayici - Her analiz sonrasi rapor kaydeder
+"""
 
-import schedule
+import os
+import sys
 import time
-import json
-import sqlite3
+import schedule
 from datetime import datetime
 
-from veri_al import get_bist100
-from kimi_al import calculate_risk_metrics
-from grok_al import calculate_ensemble
-from komutan_karari import final_decision
-from teknik_al import calculate_technical_indicators
-from makro_al import get_macro_data
-from medya_al import get_media_sentiment
+BASE_DIR = r"C:\Users\Administrator\PycharmProjects\PythonProject\Kimi"
+RAPOR_DIR = os.path.join(BASE_DIR, "rapor")
+os.makedirs(RAPOR_DIR, exist_ok=True)
 
-from overchat_al import generate_report, save_report
+sys.path.insert(0, BASE_DIR)
 
-DB_PATH = 'borsa_komutan.db'
-
-
-def init_db():
-    """SQLite veritabanı oluştur"""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS veriler (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            symbol TEXT,
-            open REAL,
-            high REAL,
-            low REAL,
-            close REAL,
-            volume INTEGER,
-            pm REAL,
-            risk_skor REAL,
-            decision TEXT,
-            confidence REAL,
-            json_data TEXT
-        )
-    ''')
-
-    # Eski raporlar tablosunu sil ve yeniden oluştur (veri_id ekle)
-    c.execute('DROP TABLE IF EXISTS raporlar')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS raporlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            rapor_saati TEXT,
-            timestamp TEXT,
-            karar TEXT,
-            guven REAL,
-            risk_skor REAL,
-            mesaj TEXT,
-            veri_id INTEGER
-        )
-    ''')
-
-    conn.commit()
-    conn.close()
-    print("✅ Veritabanı hazır")
+# Modulleri import et
+try:
+    from hisse_analiz import tum_hisseleri_analiz_et, al_sat_listeleri_olustur, rapor_kaydet, HISSE_LISTESI, AI_MODEL
+    from komutan_karar import KomutanKararMotoru
+    from komutan_karari import send_telegram_message as telegram_gonder
+    from eposta_rapor import gunluk_rapor_gonder
+    KOMUTAN = KomutanKararMotoru()
+    print("[INFO] Komutan Karar Motoru aktif")
+except ImportError as e:
+    print(f"[UYARI] Modul hatasi: {e}")
+    KOMUTAN = None
 
 
-def kaydet_veri(data_result, risk, ensemble, final):
-    """Veriyi SQLite'a kaydet"""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+# =============================================================================
+# GOREVLER (Her biri rapor kaydeder)
+# =============================================================================
 
-    df = data_result['data']
-    last = len(df) - 1
+def analiz_ve_rapor(gorev_adi, hisse_sayisi=50):
+    """Analiz yap ve rapor kaydet."""
+    print(f"\n{'='*70}")
+    print(f"  {gorev_adi} - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*70}")
 
-    c.execute('''
-        INSERT INTO veriler 
-        (timestamp, symbol, open, high, low, close, volume, pm, risk_skor, decision, confidence, json_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'XU100',
-        float(df['Open'].iloc[last]),
-        float(df['High'].iloc[last]),
-        float(df['Low'].iloc[last]),
-        float(df['Close'].iloc[last]),
-        int(df['Volume'].iloc[last]),
-        float(df['PM'].iloc[last]) if 'PM' in df.columns else 0.0,
-        risk['risk_skor'],
-        final['decision'],
-        final['confidence'],
-        json.dumps({
-            'ensemble': ensemble['ensemble'],
-            'decision': final['decision']
-        })
-    ))
+    try:
+        # Analiz
+        print(f"  [INFO] {hisse_sayisi} hisse analiz ediliyor...")
+        sonuclar = tum_hisseleri_analiz_et(HISSE_LISTESI[:hisse_sayisi], max_workers=3)
 
-    conn.commit()
-    conn.close()
-    print("✅ Veri kaydedildi")
+        # AL/SAT listeleri
+        al, sat, notr = al_sat_listeleri_olustur(sonuclar)
 
+        # RAPOR KAYDET
+        print(f"  [INFO] Rapor kaydediliyor...")
+        txt_path, json_path = rapor_kaydet(al, sat, notr)
+        print(f"  [OK] Rapor: {os.path.basename(txt_path)}")
 
-def saat_11_00():
-    """Saat 11:00 veri çekme"""
-    print(f"\n{'=' * 60}")
-    print(f"📊 SAAT 11:00 VERİ ÇEKİMİ")
-    print(f"{'=' * 60}")
+        # Komutan kararlari (varsa)
+        if KOMUTAN:
+            print(f"\n  KOMUTAN KARARLARI:")
+            print(f"  {'-'*50}")
+            for result in sonuclar:
+                if not isinstance(result, dict):
+                    continue
+                ticker = result.get('ticker', '?')
+                skor = result.get('skor', 0)
+                fiyat = result.get('fiyat', 0)
+                skorlar = result.get('skorlar', {})
+                if skor and skor >= 0.6:
+                    try:
+                        karar = KOMUTAN.karar_ver(ticker, skorlar, fiyat)
+                        print(f"  {ticker}: {karar['karar']} - {karar['neden'][:40]}")
+                    except:
+                        pass
 
-    data_result = get_bist100()
-    if data_result['status'] == 'OK':
-        df = data_result['data']
+        print(f"\n  [OK] {gorev_adi} tamamlandi.")
+        print(f"  AL: {len(al)}, SAT: {len(sat)}, NOTR: {len(notr)}")
 
-        risk = calculate_risk_metrics(df)
-        teknik = calculate_technical_indicators(df)
-        makro = get_macro_data()
-        medya = get_media_sentiment()
+        # Telegram bildirimi
+        try:
+            mesaj = (
+                f"[KIMI] {gorev_adi}\n"
+                f"{datetime.now().strftime('%H:%M')}\n"
+                f"AL: {len(al)} | SAT: {len(sat)} | NOTR: {len(notr)}\n"
+            )
+            if al:
+                ilk_bes = [a[0] if isinstance(a, tuple) else str(a) for a in al[:5]]
+                mesaj += f"Top AL: {', '.join(ilk_bes)}"
+            telegram_gonder(mesaj)
+            print(f"  [OK] Telegram gonderildi.")
+        except Exception as e:
+            print(f"  [UYARI] Telegram: {e}")
 
-        ensemble = calculate_ensemble(
-            teknik={'score': teknik['score'], 'weight': 0.4},
-            risk={'score': risk['risk_skor'], 'level': risk['risk_level'], 'weight': 0.25},
-            makro={'score': makro['score'], 'weight': 0.2},
-            medya={'score': medya['score'], 'weight': 0.15}
-        )
-        final = final_decision(ensemble, risk, auto_send=False)
-
-        kaydet_veri(data_result, risk, ensemble, final)
-
-        print(f"✅ Fiyat: {risk['last_price']}")
-        print(f"✅ Karar: {final['decision']} | Güven: %{final['confidence']}")
-        print(f"✅ Risk: {risk['risk_skor']}/100")
-        print(f"{'=' * 60}")
-
-        return True
-    else:
-        print(f"❌ Hata: {data_result['message']}")
-        return False
+    except Exception as e:
+        print(f"  [HATA] {gorev_adi}: {e}")
 
 
-def saat_15_00():
-    """Saat 15:00 veri çekme"""
-    print(f"\n{'=' * 60}")
-    print(f"📊 SAAT 15:00 VERİ ÇEKİMİ")
-    print(f"{'=' * 60}")
-    return saat_11_00()
+def premarket_scan():
+    """08:30 - Pre-market."""
+    print(f"\n{'='*70}")
+    print(f"  PRE-MARKET SCAN - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*70}")
+    try:
+        from premarket_scan import PremarketScan
+        pm = PremarketScan()
+        sonuc = pm.tara(['THYAO.IS', 'GARAN.IS', 'ASELS.IS', 'EREGL.IS', 'SASA.IS'])
+        print(f"  Piyasa: {sonuc['piyasa_durumu']}")
+        print(f"  Firsat: {len(sonuc.get('firsatlar', []))} hisse")
+        print("  [OK] Pre-market tamamlandi.")
+    except Exception as e:
+        print(f"  [HATA] Pre-market: {e}")
 
 
-def rapor_yaz():
-    """Rapor oluştur ve kaydet"""
-    print(f"\n{'=' * 60}")
-    print(f"📝 RAPOR YAZILIYOR - {datetime.now().strftime('%H:%M')}")
-    print(f"{'=' * 60}")
-
-    data_result = get_bist100()
-    if data_result['status'] == 'OK':
-        df = data_result['data']
-
-        risk = calculate_risk_metrics(df)
-        teknik = calculate_technical_indicators(df)
-        makro = get_macro_data()
-        medya = get_media_sentiment()
-
-        ensemble = calculate_ensemble(
-            teknik={'score': teknik['score'], 'weight': 0.4},
-            risk={'score': risk['risk_skor'], 'level': risk['risk_level'], 'weight': 0.25},
-            makro={'score': makro['score'], 'weight': 0.2},
-            medya={'score': medya['score'], 'weight': 0.15}
-        )
-        final = final_decision(ensemble, risk, auto_send=False)
-
-        report_data = {
-            'teknik': teknik,
-            'makro': makro,
-            'medya': medya
-        }
-
-        report = generate_report(report_data, risk, ensemble, final)
-        filename = save_report(report)
-
-        print(f"✅ Rapor kaydedildi: {filename}")
-        print(f"{'=' * 60}")
-
-        return True
-    else:
-        print(f"❌ Hata: {data_result['message']}")
-        return False
+def acilis_analizi():
+    """09:00 - Acilis."""
+    analiz_ve_rapor("ACILIS ANALIZI", 50)
 
 
-# Zamanlayıcı
-schedule.every().day.at("11:00").do(saat_11_00)
-schedule.every().day.at("15:00").do(saat_15_00)
-schedule.every().day.at("11:10").do(rapor_yaz)
-schedule.every().day.at("19:10").do(rapor_yaz)
+def ogle_raporu():
+    """12:00 - Ogle."""
+    analiz_ve_rapor("OGLE RAPORU", 50)
 
-print("=" * 60)
-print(" BORSA KOMUTAN ZAMANLAYICI BAŞLATILDI")
-print("=" * 60)
-print(" Görevler:")
-print("  • 11:00 - Veri çekme")
-print("  • 15:00 - Veri çekme")
-print("  • 11:10 - Rapor yazma")
-print("  • 19:10 - Rapor yazma")
-print("=" * 60)
-print(" Çıkmak için Ctrl+C")
-print("=" * 60)
 
-init_db()
+def kapanis_oncesi():
+    """15:00 - Kapanis oncesi."""
+    analiz_ve_rapor("KAPANIS ONCESI", 50)
 
-# Test modu
-print("\n🧪 TEST MODU - Hemen çalıştırılıyor...")
-saat_11_00()
-rapor_yaz()
-print("✅ Test tamamlandı\n")
 
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+def gece_egitimi():
+    """23:00 - AI model gece egitimi (580 hisse, 5 yil)."""
+    print(f"\n{'='*70}")
+    print(f"  GECE EGITIMI - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*70}")
+    try:
+        from ai_skorlayici import AIModel
+        from hisse_listesi import HISSE_LISTESI
+        model = AIModel()
+        basari = model.egit(HISSE_LISTESI, period="5y", esik_al=0.02, esik_sat=-0.02)
+        if basari:
+            print(f"  [OK] 580 hisse x 5y egitimi basarili!")
+            try:
+                if AI_MODEL and hasattr(AI_MODEL, 'modeli_yenile'):
+                    AI_MODEL.modeli_yenile(str(model.model_yolu))
+                    print(f"  [OK] AI Motoru model yenilendi")
+            except Exception as e:
+                print(f"  [UYARI] Model yenileme: {e}")
+        else:
+            print(f"  [HATA] Egitim basarisiz!")
+    except Exception as e:
+        print(f"  [HATA] Gece egitimi: {e}")
+
+
+def gun_sonu_raporu():
+    """18:00 - Gun sonu + e-posta."""
+    analiz_ve_rapor("GUN SONU RAPORU", 50)
+
+    # E-posta gonder
+    try:
+        print(f"\n  [INFO] E-posta gonderiliyor...")
+        sifre = "btokbnymhmlglroz"
+        gunluk_rapor_gonder(RAPOR_DIR, sifre=sifre)
+        print(f"  [OK] E-posta gonderildi!")
+    except Exception as e:
+        print(f"  [HATA] E-posta: {e}")
+
+    # Ogrenme
+    if KOMUTAN:
+        try:
+            print(f"\n  [INFO] Ogrenme guncelleniyor...")
+            import yfinance as yf
+            for karar in KOMUTAN.ogrenme.veriler['kararlar']:
+                if karar['durum'] == 'BEKLIYOR':
+                    try:
+                        data = yf.download(karar['ticker'], period='1d', progress=False)
+                        if data is not None and len(data) > 0:
+                            fiyat = float(data['Close'].iloc[-1])
+                            KOMUTAN.ogren(karar['id'], fiyat)
+                    except:
+                        pass
+            print(f"  [OK] Ogrenme tamamlandi.")
+        except Exception as e:
+            print(f"  [HATA] Ogrenme: {e}")
+
+
+# =============================================================================
+# ZAMANLAYICI
+# =============================================================================
+
+def zamanlayici_baslat():
+    """Zamanlayiciyi baslat."""
+    print("\n" + "="*70)
+    print("  BORSA KOMUTAN v4.0 - ZAMANLAYICI")
+    print("="*70)
+    print("\n  Program:")
+    print("    08:30 - Pre-market Scan")
+    print("    09:00 - Acilis Analizi")
+    print("    12:00 - Ogle Raporu")
+    print("    15:00 - Kapanis Oncesi")
+    print("    18:00 - Gun Sonu + E-posta")
+    print("    23:00 - AI Gece Egitimi (580 hisse, 5y)")
+    print("\n  CTRL+C ile durdurabilirsiniz.")
+    print("="*70 + "\n")
+
+    schedule.every().day.at("08:30").do(premarket_scan)
+    schedule.every().day.at("09:00").do(acilis_analizi)
+    schedule.every().day.at("12:00").do(ogle_raporu)
+    schedule.every().day.at("15:00").do(kapanis_oncesi)
+    schedule.every().day.at("18:00").do(gun_sonu_raporu)
+    schedule.every().day.at("23:00").do(gece_egitimi)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+
+# =============================================================================
+# CALISTIR
+# =============================================================================
+
+# YENI (normal mod)
+if __name__ == "__main__":
+    zamanlayici_baslat()
+
+    # NORMAL MOD (Zamanlayici - yorum kaldirirsan aktif olur)
+    # zamanlayici_baslat()

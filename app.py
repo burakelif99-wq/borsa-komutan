@@ -1,171 +1,179 @@
-# app.py - BIST KOMUTAN FLASK SUNUCU (Render için optimize)
+# app.py - Borsa Komutan Dashboard v3.0 (DÜZELTİLMİŞ)
 
-import sys
-import os
-import traceback
-import math
+from flask import Flask, render_template_string, jsonify, request
 from datetime import datetime
-from flask import Flask, jsonify, make_response, request
-from flask_cors import CORS
+import json
+from arsiv import Arsiv
+from grok_al import calculate_ensemble
+from hisse_analiz import analyze_hisse, analyze_top50, get_top_picks
+from veri_al import get_bist100, get_usdtry
+from hisse_listesi import BIST_HISSE_LISTESI, get_sector, SEKTOR_MAP
+from max_drawdown import MaxDrawdown
+app = Flask(__name__)
+arsiv = Arsiv()
+dd_trackers = {}
 
-# Kimi klasörünü path'e ekle
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# HTML TEMPLATE (Basit dashboard)
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Borsa Komutan v3.0</title>
+    <style>
+        body { font-family: Arial; background: #1a1a2e; color: #eee; padding: 20px; }
+        h1 { color: #00d4ff; }
+        .card { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        a { color: #00d4ff; }
+    </style>
+</head>
+<body>
+    <h1>🚀 BORSA KOMUTAN v3.0</h1>
+    <div class="card">
+        <h3>API Endpoint'leri:</h3>
+        <ul>
+            <li><a href="/api/ensemble">/api/ensemble</a> - Ensemble analiz (XU100)</li>
+            <li><a href="/api/usdtry">/api/usdtry</a> - USD/TRY kuru</li>
+            <li><a href="/api/hisse_listesi">/api/hisse_listesi</a> - Hisse listesi</li>
+            <li><a href="/api/top50">/api/top50</a> - Top 50 analiz</li>
+            <li><a href="/api/all100">/api/all100</a> - Tüm BIST100 analiz</li>
+            <li><a href="/api/top_picks">/api/top_picks</a> - En iyi öneriler</li>
+            <li>/api/hisse/&lt;ticker&gt; - Tek hisse analiz</li>
+            <li>/api/drawdown/&lt;ticker&gt; - Drawdown takibi</li>
+            <li>/api/arsiv/&lt;hisse&gt; - Arşiv kayıtları</li>
+            <li>/api/arsiv/istatistik/&lt;hisse&gt; - Arşiv istatistikleri</li>
+            <li>/api/arsiv/trend/&lt;hisse&gt; - Trend analizi</li>
+        </ul>
+    </div>
+</body>
+</html>
+"""
 
-# Modülleri import et
-try:
-    from veri_al import get_bist100, get_ohlcv_json
-    from kimi_al import calculate_risk_metrics
-    from grok_al import calculate_ensemble
-    from komutan_karari import final_decision
-    from teknik_al import calculate_technical_indicators
-    from makro_al import get_macro_data
-    from medya_al import get_media_sentiment
-
-    MODULES_OK = True
-except ImportError as e:
-    print(f"⚠️ Modül import hatası: {e}")
-    MODULES_OK = False
-
-app = Flask(__name__, template_folder='.', static_folder='.')
-
-# CORS - Tüm originlere izin ver (Render için kritik)
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept"]
-    }
-})
-
-
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
-
-
+# ROUTE'LAR
 @app.route('/')
 def dashboard():
-    """Ana dashboard sayfası"""
-    return app.send_static_file('bist-dashboard.html')
+    return render_template_string(DASHBOARD_HTML)
 
+@app.route('/api/ensemble')
+def api_ensemble():
+    zaman_dilimi = request.args.get('zaman_dilimi', '1D')
+    result = get_bist100()
 
-@app.route('/api/data')
-def get_data():
-    """Tüm modül verilerini JSON olarak döndür"""
-    if not MODULES_OK:
-        return jsonify({
-            'status': 'ERROR',
-            'message': 'Modüller yüklenemedi'
-        })
+    if result['status'] == 'OK':
+        ensemble = calculate_ensemble(df=result['data'], zaman_dilimi=zaman_dilimi)
 
-    try:
-        # 1. Veri çek
-        data_result = get_bist100()
-        if data_result['status'] != 'OK':
-            return jsonify({
-                'status': 'ERROR',
-                'message': 'Veri çekilemedi'
-            })
+        # ARŞİVE KAYDET (XU100)
+        try:
+            arsiv.kaydet_analiz('XU100', ensemble, zaman_dilimi)
+        except:
+            pass
 
-        df = data_result['data']
+        return jsonify(ensemble)
 
-        # 2. OHLCV JSON
-        ohlcv = get_ohlcv_json(df)
+    return jsonify(result)
 
-        # 3. Modülleri çalıştır
-        teknik = calculate_technical_indicators(df)
-        risk = calculate_risk_metrics(df)
-        makro = get_macro_data()
-        medya = get_media_sentiment()
+@app.route('/api/usdtry')
+def api_usdtry():
+    return jsonify(get_usdtry())
 
-        # 4. Ensemble
-        ensemble = calculate_ensemble(
-            teknik={'score': teknik['score'], 'weight': 0.4},
-            risk={'score': risk['risk_skor'], 'level': risk['risk_level'], 'weight': 0.25},
-            makro={'score': makro['score'], 'weight': 0.2},
-            medya={'score': medya['score'], 'weight': 0.15}
-        )
+@app.route('/api/hisse/<ticker>')
+def api_hisse(ticker):
+    zaman_dilimi = request.args.get('zaman_dilimi', '1D')
+    result = analyze_hisse(ticker, zaman_dilimi=zaman_dilimi)
 
-        # 5. Komutan kararı
-        final = final_decision(ensemble, risk, auto_send=False)
+    # ARŞİVE KAYDET
+    if result['status'] == 'OK':
+        try:
+            arsiv.kaydet_analiz(
+                ticker,
+                result,
+                zaman_dilimi,
+                fiyat=result.get('last_price'),
+                degisim=result.get('change_pct'),
+                sektor=result.get('sector')
+            )
+        except:
+            pass
 
-        # NaN temizleme
-        def clean_nan(obj):
-            if isinstance(obj, float) and math.isnan(obj):
-                return None
-            if isinstance(obj, dict):
-                return {k: clean_nan(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [clean_nan(v) for v in obj]
-            return obj
+    return jsonify(result)
 
-        response_data = {
-            'status': 'OK',
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'ohlcv': ohlcv,
-            'risk': risk,
-            'teknik': clean_nan(teknik),
-            'makro': makro,
-            'medya': medya,
-            'ensemble': clean_nan(ensemble['ensemble']),
-            'decision': {
-                'karar': final['decision'],
-                'guven': final['confidence'],
-                'mesaj': final['message']
-            },
-            'modules': {
-                'veri': {'status': 'OK', 'last_update': data_result['last_update']},
-                'teknik': {'status': teknik['status'], 'score': teknik['score']},
-                'kimi': {'status': 'OK', 'risk_skor': risk['risk_skor']},
-                'makro': {'status': makro['status'], 'score': makro['score']},
-                'medya': {'status': medya['status'], 'score': medya['score']},
-                'grok': {'status': 'OK', 'final_score': ensemble['ensemble']['final_score']},
-                'komutan': {'status': 'READY', 'decision': final['decision']}
-            }
-        }
+@app.route('/api/top50')
+def api_top50():
+    zaman_dilimi = request.args.get('zaman_dilimi', '1D')
+    result = analyze_top50_fast(zaman_dilimi=zaman_dilimi)
+    return jsonify(result)
 
-        return make_response(jsonify(response_data))
+@app.route('/api/all100')
+def api_all100():
+    zaman_dilimi = request.args.get('zaman_dilimi', '1D')
+    result = analyze_top50_fast(zaman_dilimi=zaman_dilimi)
+    return jsonify(result)
 
-    except Exception as e:
-        error_trace = traceback.format_exc()
-        print(f"❌ HATA: {e}\n{error_trace}")
-        return jsonify({
-            'status': 'ERROR',
-            'message': str(e),
-            'trace': error_trace
-        })
+@app.route('/api/top_picks')
+def api_top_picks():
+    zaman_dilimi = request.args.get('zaman_dilimi', '1D')
+    n = int(request.args.get('n', 10))
+    result = get_top_picks(zaman_dilimi=zaman_dilimi, n=n)
+    return jsonify(result)
 
-
-@app.route('/api/refresh')
-def refresh():
-    """Manuel yenileme"""
-    return get_data()
-
-
-@app.route('/api/health')
-def health_check():
-    """Sağlık kontrolü"""
+@app.route('/api/hisse_listesi')
+def api_hisse_listesi():
     return jsonify({
         'status': 'OK',
-        'modules_loaded': MODULES_OK,
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'total': len(BIST_HISSE_LISTESI),
+        'hisseler': BIST_HISSE_LISTESI,
+        'sectors': sorted(list(set(SEKTOR_MAP.values())))
     })
 
+@app.route('/api/drawdown/<ticker>')
+def api_drawdown(ticker):
+    try:
+        import yfinance as yf
+        stock = yf.Ticker(ticker)
+        df = stock.history(period="3mo")
+        if df.empty:
+            return jsonify({'status': 'HATA', 'message': 'Veri bulunamadı'})
 
-if __name__ == '__main__':
-    print("=" * 60)
-    print(" BIST KOMUTAN SUNUCU BAŞLATILIYOR")
-    print("=" * 60)
-    print(f" Modüller: {'✅ Yüklendi' if MODULES_OK else '❌ Hatalı'}")
-    print("-" * 60)
-    print(" Dashboard: http://localhost:5000")
-    print(" API:      http://localhost:5000/api/data")
-    print(" Health:   http://localhost:5000/api/health")
-    print("=" * 60)
+        if ticker not in dd_trackers:
+            dd_trackers[ticker] = MaxDrawdown(esik=-0.20, hisse_adi=ticker)
 
-    # Render için PORT ortam değişkenini kullan
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port, threaded=True)
+        current_price = float(df['Close'].iloc[-1])
+        dd_result = dd_trackers[ticker].guncelle(current_price)
+
+        return jsonify({'status': 'OK', 'ticker': ticker, 'drawdown': dd_result})
+    except Exception as e:
+        return jsonify({'status': 'HATA', 'message': str(e)})
+
+@app.route('/api/arsiv/<hisse>')
+def api_arsiv(hisse):
+    try:
+        limit = int(request.args.get('limit', 30))
+        veri = arsiv.getir(hisse, limit=limit)
+        return jsonify({'status': 'OK', 'hisse': hisse, 'kayitlar': veri})
+    except Exception as e:
+        return jsonify({'status': 'HATA', 'message': str(e)})
+
+@app.route('/api/arsiv/istatistik/<hisse>')
+def api_arsiv_istatistik(hisse):
+    try:
+        gun = int(request.args.get('gun', 30))
+        stats = arsiv.istatistik(hisse, gun=gun)
+        return jsonify({'status': 'OK', 'istatistik': stats})
+    except Exception as e:
+        return jsonify({'status': 'HATA', 'message': str(e)})
+
+@app.route('/api/arsiv/trend/<hisse>')
+def api_arsiv_trend(hisse):
+    try:
+        gun = int(request.args.get('gun', 30))
+        trend = arsiv.trend_analizi(hisse, gun=gun)
+        return jsonify({'status': 'OK', 'trend': trend})
+    except Exception as e:
+        return jsonify({'status': 'HATA', 'message': str(e)})
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("BORSA KOMUTAN v3.0 BASLATILIYOR")
+    print("=" * 60)
+    print("http://localhost:5000")
+    print("=" * 60)
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

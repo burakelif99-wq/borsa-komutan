@@ -5,8 +5,8 @@ import requests
 from datetime import datetime
 
 # Telegram Bot Token ve Chat ID (kendi bilgilerinle değiştir)
-TELEGRAM_BOT_TOKEN = "SENIN_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "SENIN_CHAT_ID"
+TELEGRAM_BOT_TOKEN = "8918152121:AAFjjYnCORAmF0DZVtoW3Fe1xGDhL9me1Bk"
+TELEGRAM_CHAT_ID = "7148930037"
 
 
 def send_telegram_message(message, token=None, chat_id=None):

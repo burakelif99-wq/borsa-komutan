@@ -37,6 +37,7 @@
         </div>
     </header>
 
+    <!-- Ticker - Canlı Hisse Verileri -->
     <div class="bg-slate-800 border-b border-slate-700 overflow-hidden py-2">
         <div class="ticker whitespace-nowrap flex gap-8 text-sm">
             <span class="text-emerald-400">XU100: <span id="ticker-xu100">--</span></span>
@@ -50,6 +51,12 @@
             <span class="text-emerald-400">GARAN: <span id="ticker-garan">--</span></span>
             <span class="text-slate-400">|</span>
             <span class="text-emerald-400">ASELS: <span id="ticker-asels">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">EREGL: <span id="ticker-eregl">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">SASA: <span id="ticker-sasa">--</span></span>
+            <span class="text-slate-400">|</span>
+            <span class="text-emerald-400">KONTR: <span id="ticker-kontr">--</span></span>
             <span class="text-slate-400">|</span>
             <span class="text-emerald-400">XU100: <span id="ticker-xu100-2">--</span></span>
             <span class="text-slate-400">|</span>
@@ -257,10 +264,12 @@
     </div>
 
     <script>
-        const API_URL = 'https://borsa-komutan.onrender.com/api/data';
+        const API_URL = 'http://localhost:5000/api/data';
+        const HISSE_URL = 'http://localhost:5000/api/hisseler';
 
         async function fetchRealData() {
             try {
+                // Ana veri
                 const response = await fetch(API_URL, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' },
@@ -276,6 +285,16 @@
                     updateDashboard(data);
                     updateChart(data.ohlcv);
                 }
+
+                // Hisse verileri
+                try {
+                    const hisseResponse = await fetch(HISSE_URL);
+                    const hisseler = await hisseResponse.json();
+                    updateTicker(hisseler);
+                } catch (e) {
+                    console.error('Hisse hatası:', e);
+                }
+
             } catch (error) {
                 console.error('Hata:', error);
                 document.getElementById('module-detail').innerHTML =
@@ -283,19 +302,52 @@
             }
         }
 
+        function updateTicker(hisseler) {
+            // XU100
+            if (hisseler.XU100) {
+                const fiyat = hisseler.XU100.fiyat.toFixed(2);
+                document.getElementById('ticker-xu100').textContent = fiyat;
+                document.getElementById('ticker-xu100-2').textContent = fiyat;
+            }
+
+            // Diğer hisseler
+            const hisseMap = {
+                'THYAO': 'ticker-thyao',
+                'GARAN': 'ticker-garan',
+                'ASELS': 'ticker-asels',
+                'EREGL': 'ticker-eregl',
+                'SASA': 'ticker-sasa',
+                'KONTR': 'ticker-kontr'
+            };
+
+            for (const [hisse, elementId] of Object.entries(hisseMap)) {
+                if (hisseler[hisse]) {
+                    const h = hisseler[hisse];
+                    const renk = h.degisim >= 0 ? 'text-emerald-400' : 'text-red-400';
+                    document.getElementById(elementId).textContent =
+                        `${h.fiyat} (${h.degisim >= 0 ? '+' : ''}${h.degisim}%)`;
+                    document.getElementById(elementId).className = renk;
+                }
+            }
+
+            // USD/TRY
+            if (hisseler.USDTRY) {
+                document.getElementById('ticker-usd').textContent =
+                    `${hisseler.USDTRY.fiyat}`;
+            }
+        }
+
         function updateDashboard(data) {
             const ohlcv = data.ohlcv;
             const last = ohlcv.close.length - 1;
 
+            // OHLCV
             document.getElementById('ohlc-open').textContent = ohlcv.open[last].toFixed(2);
             document.getElementById('ohlc-high').textContent = ohlcv.high[last].toFixed(2);
             document.getElementById('ohlc-low').textContent = ohlcv.low[last].toFixed(2);
             document.getElementById('ohlc-close').textContent = ohlcv.close[last].toFixed(2);
 
-            const close = ohlcv.close[last].toFixed(2);
-            document.getElementById('ticker-xu100').textContent = close;
-            document.getElementById('ticker-xu100-2').textContent = close;
-
+            // Komutan Kararı
             const decision = data.decision.karar;
             const el = document.getElementById('komutan-decision');
             el.textContent = decision;
@@ -306,6 +358,7 @@
             document.getElementById('confidence-score').textContent = '%' + data.decision.guven;
             document.getElementById('risk-skor').textContent = data.risk.risk_skor + '/100';
 
+            // Modül Skorları
             const modules = data.ensemble.module_breakdown;
             if (modules.teknik) {
                 document.getElementById('score-teknik').textContent = modules.teknik.score;
@@ -324,6 +377,7 @@
                 document.getElementById('bar-medya').style.width = modules.medya.score + '%';
             }
 
+            // Rapor
             document.getElementById('rapor-time').textContent = data.timestamp.split(' ')[1];
             document.getElementById('rapor-text').textContent =
                 `Karar: ${decision} | Güven: %${data.decision.guven} | Risk: ${data.risk.risk_level}`;
@@ -400,6 +454,7 @@
                 </div>
             `;
 
+            // Modül durumlarını güncelle
             document.getElementById('status-veri').className = 'w-2 h-2 rounded-full bg-emerald-500 pulse';
             document.getElementById('status-teknik').className = 'w-2 h-2 rounded-full bg-emerald-500 pulse';
             document.getElementById('status-risk').className = 'w-2 h-2 rounded-full bg-emerald-500';
